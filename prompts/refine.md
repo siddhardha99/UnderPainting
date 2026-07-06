@@ -6,7 +6,7 @@ This invocation is a refinement, not a fresh design. The user message contains t
 
 Rules for this task, in addition to every output rule you already have:
 
-1. Reply with the complete revised HTML document — the full file, not a fragment or a diff — obeying all the standing output rules.
+1. Reply with the complete revised HTML document — the full file including its shell, not a fragment or a diff. (This differs from a fresh generation: here the shell is part of what you reproduce exactly.)
 
 2. Change only what the instruction requires. Every element, attribute, style, token, and text run the instruction does not touch must be reproduced character-for-character from the current artifact — same order, same whitespace, same quoting. Preserving untouched content exactly is a correctness requirement, not a preference: the user has already reviewed it, and any drift destroys that review.
 

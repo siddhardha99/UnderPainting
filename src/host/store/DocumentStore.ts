@@ -31,6 +31,9 @@ export const versionMetaSchema = z
     promptTokens: z.number().nullable(),
     completionTokens: z.number().nullable(),
     prompt: z.string(),
+    /** Validator outcome (M1 item 6); absent on pre-validator versions = treated as validated. */
+    validated: z.boolean().optional(),
+    issues: z.array(z.string()).optional(),
   })
   .strict();
 export type VersionMeta = z.infer<typeof versionMetaSchema>;
@@ -61,6 +64,8 @@ export interface CommitInput {
   costUsd: number | null;
   promptTokens: number | null;
   completionTokens: number | null;
+  validated?: boolean;
+  issues?: string[];
 }
 
 export class DocumentStore {
@@ -137,6 +142,8 @@ export class DocumentStore {
       promptTokens: input.promptTokens,
       completionTokens: input.completionTokens,
       prompt: input.prompt,
+      validated: input.validated ?? true,
+      issues: input.issues ?? [],
     };
     await fs.writeFile(this.versionPath(meta.id), input.html, 'utf8');
     await this.writeManifest({

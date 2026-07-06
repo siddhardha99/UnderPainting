@@ -11,7 +11,9 @@ import { buildCanvasHtml } from './canvasHtml';
 import { DESIGN_DIR } from '../store/writeScope';
 import { DocumentStore, type VersionMeta } from '../store/DocumentStore';
 import { SystemStore } from '../store/SystemStore';
+import { CostLedger } from '../store/CostLedger';
 import { checkDrift } from '../extractor/DesignSystemExtractor';
+import { validateArtifact } from '../validator/Validator';
 
 export interface CanvasDeps {
   client: OpenRouterClient;
@@ -21,8 +23,15 @@ export interface CanvasDeps {
   loadCorePrompt: () => Promise<string>;
   loadRefineRecipe: () => Promise<string>;
   loadGroundingPreamble: () => Promise<string>;
+  loadCorrectionRecipe: () => Promise<string>;
+  loadPageScaffold: () => Promise<string>;
   getGenerationModel: () => string | undefined;
+  getValidationModel: () => string | undefined;
+  /** Pricing cached when the model was picked; undefined when hand-edited into settings. */
+  getModelPricing: (modelId: string) => string | undefined;
   onModelUnavailable: (modelId: string) => void;
+  /** Fired when a run's API activity ends — the host refreshes status-bar credits (§9). */
+  onRequestCompleted: () => void;
 }
 
 export class CanvasPanel {
@@ -86,6 +95,23 @@ export class CanvasPanel {
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     this.store = workspaceRoot ? new DocumentStore(workspaceRoot) : null;
     const systemStore = workspaceRoot ? new SystemStore(workspaceRoot) : null;
+    const ledger = workspaceRoot ? new CostLedger(workspaceRoot) : null;
+
+    // The point-of-spend disclosure (P4): which model Send will use and what
+    // it costs, from pricing cached at pick time — display never fetches (P3).
+    const postModelState = (): void => {
+      const modelId = deps.getGenerationModel() ?? null;
+      post({
+        type: 'modelState',
+        modelId,
+        pricing: modelId ? (deps.getModelPricing(modelId) ?? null) : null,
+      });
+    };
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration('underpainting')) postModelState();
+      }),
+    );
 
     // Cheap drift check (§6): rehash the extractor's recorded sources and
     // surface a non-blocking hint. Fire-and-forget; never blocks, never
@@ -113,9 +139,19 @@ export class CanvasPanel {
       loadCorePrompt: deps.loadCorePrompt,
       loadRefineRecipe: deps.loadRefineRecipe,
       loadGroundingPreamble: deps.loadGroundingPreamble,
+      loadCorrectionRecipe: deps.loadCorrectionRecipe,
+      loadPageScaffold: deps.loadPageScaffold,
       loadGroundingTokens: async () => (systemStore ? systemStore.readTokensCss() : null),
       getGenerationModel: deps.getGenerationModel,
+      getValidationModel: deps.getValidationModel,
       onModelUnavailable: deps.onModelUnavailable,
+      recordSpend: ledger
+        ? (record) =>
+            void ledger
+              .append(record)
+              .catch((err) => deps.logger.error(`ledger append failed: ${formatError(err)}`))
+        : undefined,
+      onRequestCompleted: deps.onRequestCompleted,
       post,
       commit: this.store
         ? async (result) => {
@@ -137,6 +173,7 @@ export class CanvasPanel {
         switch (message.type) {
           case 'ready':
             post({ type: 'workspaceState', open: this.store !== null });
+            postModelState();
             void deps.keyVault.hasKey().then((present) => post({ type: 'keyState', present }));
             void this.postFrames(post, null).catch((err) =>
               deps.logger.error(`frame index load failed: ${formatError(err)}`),
@@ -184,6 +221,9 @@ export class CanvasPanel {
             // zero API involvement — free (P4). New snapshot, old untouched.
             void (async () => {
               if (!this.store) return;
+              // Re-validate the edited document (free, local) so the frame's
+              // validated badge stays truthful after splices.
+              const issues = validateArtifact(message.html).map((i) => `[${i.rule}] ${i.message}`);
               const meta = await this.store.commitVersion({
                 html: message.html,
                 prompt: `Direct text edit (${message.editCount} change${message.editCount === 1 ? '' : 's'})`,
@@ -191,6 +231,8 @@ export class CanvasPanel {
                 costUsd: 0,
                 promptTokens: null,
                 completionTokens: null,
+                validated: issues.length === 0,
+                issues,
               });
               await this.postFrames(post, meta.id);
             })().catch((err) => deps.logger.error(`edit commit failed: ${formatError(err)}`));
@@ -246,5 +288,6 @@ function toFrameMeta(v: VersionMeta, currentId: string | null): FrameMeta {
     subtitle: `${when} · ${promptExcerpt}`,
     prompt: v.prompt,
     isCurrent: v.id === currentId,
+    validated: v.validated ?? true,
   };
 }

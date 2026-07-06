@@ -1,5 +1,6 @@
 # Baselines for inkwell-pricing
 
-`m0-ungrounded.html` — the artifact from the first live M0 generation (approved at M0 review) belongs here as the **ungrounded "before" baseline** for the grounding comparison once the DesignSystemExtractor (M1 item 5) exists: same prompt, with vs. without `.design/system/` tokens injected.
+Both captured live on 2026-07-06 (model `~anthropic/claude-opus-latest`, core prompt v0) and approved at the item-5 review:
 
-**Status: awaiting the file.** M0 had no DocumentStore, so the approved artifact only existed in the canvas DOM and was not persisted. If the original can't be recovered, regenerate once with the same prompt before M1 item 5 lands and save it here — it must predate grounding to serve as the baseline.
+- **`m0-ungrounded.html`** — the same prompt with **no** extracted design system: the model invented an indigo palette. The "before" of the grounding comparison. Note: this run also invented the policy line "All plans include a 14-day trial…", which no prompt phrase licensed — the origin of the `inkwell-pricing-commitments` golden case.
+- **`m1-grounded.html`** — the same prompt **after** `Underpainting: Extract Design System` ran against the sandbox demo theme (`--brand: #0ea5e9` etc.): defines `#0ea5e9` exactly once (in `:root`) and consumes `var(--brand…)` 18 times. The "after".

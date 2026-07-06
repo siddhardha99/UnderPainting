@@ -77,7 +77,7 @@ describe('P6: artifact iframe isolation', () => {
 
   it('frame iframes exist only inside the clone template', () => {
     const page = html();
-    const templateBody = page.match(/<template id="frame-template">([\s\S]*?)<\/template>/);
+    const templateBody = page.match(/<template id="frame-template"[^>]*>([\s\S]*?)<\/template>/);
     expect(templateBody).not.toBeNull();
     const iframesInTemplate = templateBody![1]!.match(/<iframe/g)?.length ?? 0;
     const iframesTotal = page.match(/<iframe/g)?.length ?? 0;

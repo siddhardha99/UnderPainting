@@ -73,6 +73,17 @@ describe('DesignSystemExtractor (M1 item 5 — heuristic, read-only, no code exe
     expect(system.tokens.find((t) => t.name === '--brand')!.value).toBe('#1a2b3c');
   });
 
+  it('parses Tailwind v4 CSS-first @theme blocks (item-5 review decision)', async () => {
+    await write(
+      'src/app.css',
+      '@import "tailwindcss";\n@theme {\n  --color-primary: oklch(0.62 0.21 250);\n  --font-display: "Satoshi", sans-serif;\n}\n',
+    );
+    const system = await extractDesignSystem(root);
+    const byName = new Map(system.tokens.map((t) => [t.name, t.value]));
+    expect(byName.get('--color-primary')).toBe('oklch(0.62 0.21 250)');
+    expect(byName.get('--font-display')).toBe('"Satoshi", sans-serif');
+  });
+
   it('lifts classic Tailwind theme values into namespaced tokens without executing the config', async () => {
     await write('tailwind.config.js', TAILWIND_CONFIG);
     const system = await extractDesignSystem(root);

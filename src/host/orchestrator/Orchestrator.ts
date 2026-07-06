@@ -4,6 +4,12 @@ import { HttpError, type OpenRouterClient } from '../client/OpenRouterClient';
 import type { Logger } from '../logging/redact';
 import { formatError } from '../logging/redact';
 import { extractHtml } from './extractHtml';
+import {
+  isRedesignInstruction,
+  refinementSurvivalRatio,
+  validateArtifact,
+} from '../validator/Validator';
+import { assembleArtifact } from './scaffold';
 
 /**
  * One generation at a time: prompt → stream → cost → commit. The model comes
@@ -30,6 +36,16 @@ export interface OrchestratorDeps {
   loadCorePrompt: () => Promise<string>;
   /** The refinement recipe, loaded only for refine() invocations (§8). */
   loadRefineRecipe: () => Promise<string>;
+  /** The correction-pass recipe — the ENTIRE system prompt for corrections (§8: verifier in miniature). */
+  loadCorrectionRecipe: () => Promise<string>;
+  /**
+   * The page scaffold (A5, M1 item 7): fresh generations stream only
+   * tokens + body; the shell is copied around them, never regenerated.
+   * Undefined falls back to full-document output (pre-scaffold behavior).
+   */
+  loadPageScaffold?: () => Promise<string>;
+  /** The cheap/fast validation model for correction passes; undefined skips corrections. */
+  getValidationModel: () => string | undefined;
   /** The grounding preamble prepended to the workspace token block (§8, M1 item 5). */
   loadGroundingPreamble: () => Promise<string>;
   /** Extracted workspace tokens (tokens.css content), or null when none exist. */
@@ -44,6 +60,16 @@ export interface OrchestratorDeps {
   onModelUnavailable?: (modelId: string) => void;
   /** Posts to the webview; the poster validates and redacts (see createHostPoster). */
   post: (message: HostToWebview) => void;
+  /** Ledger hook (M1 item 8): one record per API request, corrections separate. Fire-and-forget. */
+  recordSpend?: (record: {
+    kind: 'generation' | 'refinement' | 'correction';
+    model: string;
+    costUsd: number | null;
+    promptTokens: number | null;
+    completionTokens: number | null;
+  }) => void;
+  /** Called after a run's API activity finishes — the host refreshes status-bar credits (§9). */
+  onRequestCompleted?: () => void;
   /**
    * Persist a COMPLETE generation (P5, commit-only-complete-states): called
    * strictly after the stream finishes successfully and never on cancel or
@@ -56,6 +82,8 @@ export interface OrchestratorDeps {
     costUsd: number | null;
     promptTokens: number | null;
     completionTokens: number | null;
+    validated: boolean;
+    issues: string[];
   }) => Promise<void>;
 }
 
@@ -64,6 +92,11 @@ interface RunRequest {
   prompt: string;
   system: string;
   user: string;
+  /** Refinement base for the A7 diff-minimality warning. */
+  refineBase?: string;
+  /** Wraps the streamed fragment into the scaffold shell (A5); identity for refinements. */
+  assemble?: (fragment: string) => string;
+  kind: 'generation' | 'refinement';
 }
 
 export class Orchestrator {
@@ -77,11 +110,16 @@ export class Orchestrator {
 
   /** Fresh design from a prompt, grounded in the workspace's extracted tokens when they exist. */
   async generate(userPrompt: string): Promise<void> {
-    await this.run(async () => ({
-      prompt: userPrompt,
-      system: (await this.deps.loadCorePrompt()) + (await this.groundingSection()),
-      user: userPrompt,
-    }));
+    await this.run(async () => {
+      const scaffold = await this.deps.loadPageScaffold?.();
+      return {
+        prompt: userPrompt,
+        system: (await this.deps.loadCorePrompt()) + (await this.groundingSection()),
+        user: userPrompt,
+        assemble: scaffold ? (fragment: string) => assembleArtifact(scaffold, fragment) : undefined,
+        kind: 'generation' as const,
+      };
+    });
   }
 
   /**
@@ -110,6 +148,8 @@ export class Orchestrator {
         // The artifact rides in the user message as fenced DATA; the recipe
         // pins the untrusted-content framing (§8/§9 prompt-injection stance).
         user: `<<<ARTIFACT\n${baseHtml}\nARTIFACT>>>\n\nInstruction: ${instruction}`,
+        refineBase: isRedesignInstruction(instruction) ? undefined : baseHtml,
+        kind: 'refinement' as const,
       };
     });
   }
@@ -151,6 +191,10 @@ export class Orchestrator {
     post({ type: 'streamStart' });
 
     let lastPostAt = 0;
+    const toArtifact = (raw: string): string => {
+      const fragment = extractHtml(raw);
+      return request.assemble ? request.assemble(fragment) : fragment;
+    };
     try {
       const result = await client.streamChat({
         apiKey,
@@ -162,7 +206,7 @@ export class Orchestrator {
           const now = Date.now();
           if (now - lastPostAt >= CHUNK_POST_INTERVAL_MS) {
             lastPostAt = now;
-            post({ type: 'streamChunk', html: extractHtml(accumulated) });
+            post({ type: 'streamChunk', html: toArtifact(accumulated) });
           }
         },
       });
@@ -179,9 +223,79 @@ export class Orchestrator {
           logger.error(`cost lookup failed: ${formatError(err)}`);
         }
       }
+      this.deps.recordSpend?.({ kind: request.kind, model, costUsd, promptTokens, completionTokens });
 
-      const finalHtml = extractHtml(result.text);
+      let finalHtml = toArtifact(result.text);
+
+      // ---- Validator + bounded correction loop (M1 item 6, §7/§9). Each
+      // correction pass is one call on the cheap validation model with
+      // minimal context, streamed to the canvas like any generation. The
+      // cap is absolute; surviving issues are surfaced, never silent.
+      let issues = validateArtifact(finalHtml);
+      let correctionPasses = 0;
+      const validationModel = this.deps.getValidationModel();
+      while (issues.length > 0 && correctionPasses < CORRECTION_RETRY_CAP && validationModel) {
+        if (controller.signal.aborted) break;
+        correctionPasses++;
+        post({ type: 'streamChunk', html: finalHtml });
+        logger.info(
+          `validator found ${issues.length} issue(s); correction pass ${correctionPasses}/${CORRECTION_RETRY_CAP} on ${validationModel}`,
+        );
+        try {
+          const correction = await client.streamChat({
+            apiKey,
+            model: validationModel,
+            system: await this.deps.loadCorrectionRecipe(),
+            user:
+              `<<<ARTIFACT\n${finalHtml}\nARTIFACT>>>\n\nViolations:\n` +
+              issues.map((issue, i) => `${i + 1}. [${issue.rule}] ${issue.message}`).join('\n'),
+            signal: controller.signal,
+            onDelta: (accumulated) => {
+              const now = Date.now();
+              if (now - lastPostAt >= CHUNK_POST_INTERVAL_MS) {
+                lastPostAt = now;
+                post({ type: 'streamChunk', html: extractHtml(accumulated) });
+              }
+            },
+          });
+          costUsd = addCost(costUsd, correction.costUsd);
+          this.deps.recordSpend?.({
+            kind: 'correction',
+            model: validationModel,
+            costUsd: correction.costUsd,
+            promptTokens: correction.promptTokens,
+            completionTokens: correction.completionTokens,
+          });
+          const correctedHtml = extractHtml(correction.text);
+          const correctedIssues = validateArtifact(correctedHtml);
+          if (correctedHtml.length === 0 || correctedIssues.length > issues.length) {
+            logger.error('correction pass made things worse; keeping the previous artifact');
+            break;
+          }
+          finalHtml = correctedHtml;
+          issues = correctedIssues;
+        } catch (err) {
+          if (controller.signal.aborted) throw err;
+          logger.error(`correction pass failed: ${formatError(err)}`);
+          break;
+        }
+      }
+
+      // A7 diff-minimality warning for targeted refinements (never a
+      // correction trigger — re-running the instruction costs money for the
+      // same likely result; surfacing beats silently accepting).
+      const warnings: string[] = [];
+      if (request.refineBase) {
+        const survival = refinementSurvivalRatio(request.refineBase, finalHtml);
+        if (survival < 0.5) {
+          warnings.push(
+            `A7: this targeted refinement rewrote ${Math.round((1 - survival) * 100)}% of the document — untouched content should survive. Review before building on it.`,
+          );
+        }
+      }
+
       post({ type: 'streamChunk', html: finalHtml });
+      const allIssues = [...issues.map((i) => `[${i.rule}] ${i.message}`), ...warnings];
       // Commit before streamDone so the webview can adopt its streaming
       // frame when the 'frames' message (sent inside commit) arrives first.
       if (this.deps.commit) {
@@ -193,12 +307,25 @@ export class Orchestrator {
             costUsd,
             promptTokens,
             completionTokens,
+            validated: allIssues.length === 0,
+            issues: allIssues,
           });
         } catch (err) {
           logger.error(`version commit failed: ${formatError(err)}`);
         }
       }
       post({ type: 'streamDone', costUsd, promptTokens, completionTokens });
+      if (allIssues.length > 0 || correctionPasses > 0) {
+        post({ type: 'validation', issues: allIssues, correctionPasses });
+        for (const issue of allIssues) {
+          logger.info(`validation: ${issue}`);
+        }
+        if (issues.length > 0 && !validationModel) {
+          logger.info(
+            'no validation model set — corrections skipped. Run "Underpainting: Select Validation Model" to enable the correction loop.',
+          );
+        }
+      }
       logger.info(
         `this generation: ${costUsd !== null ? `$${costUsd.toFixed(4)}` : 'cost unavailable'}` +
           ` — model ${model}` +
@@ -225,6 +352,7 @@ export class Orchestrator {
       }
     } finally {
       this.active = null;
+      this.deps.onRequestCompleted?.();
     }
   }
 
@@ -232,6 +360,13 @@ export class Orchestrator {
   cancel(): void {
     this.active?.abort();
   }
+}
+
+/** Exact-cost accounting across correction passes: sum what OpenRouter reported; unknown stays unknown-safe. */
+function addCost(a: number | null, b: number | null): number | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a + b;
 }
 
 /**

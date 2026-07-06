@@ -10,7 +10,12 @@ Extension Host (Node)
 │     usage/cost readers (stream usage + /generation fallback) · /models catalog
 ├─ Model catalog        src/host/models/      pure helpers: pricing display,
 │     deprecation → suggested-equivalent ranking (never a silent switch)
-├─ Orchestrator         src/host/orchestrator/ prompt → stream → cost → commit
+├─ Orchestrator         src/host/orchestrator/ prompt → stream → validate →
+│     correct (≤ CORRECTION_RETRY_CAP on the cheap validation model) → cost → commit
+├─ Validator            src/host/validator/   §7 as deterministic checks (no DOM,
+│     no deps): structure, A1 token-referencing + style-block contents, A2 leaf
+│     rule, A3 self-containment, A4 explicit dimensions, script ban; A7
+│     refinement-survival warning; surviving issues surfaced, never silent
 ├─ DocumentStore        src/host/store/       immutable version snapshots + manifest;
 │     commits only complete states — cancelled/failed streams never touch disk
 ├─ DesignSystemExtractor src/host/extractor/  READ-ONLY heuristic scan: :root/html
@@ -50,6 +55,12 @@ Canvas Webview (sandboxed)                    src/webview/canvas/
 
 Cost is read from OpenRouter's `usage` accounting on the final SSE frame (requested via `usage: {include: true}`); if absent, one follow-up `GET /api/v1/generation` reads the recorded cost (bounded: capped attempts, per-attempt timeout). It is never estimated.
 
+## Validator + correction loop (M1 item 6)
+
+Every completed generation is validated (`src/host/validator/Validator.ts` — pure string/tokenizer checks; the host has no DOM and the dependency budget stays at 1). Violations trigger correction passes on the **validation model** with minimal context (`prompts/correct.md` is the entire system prompt — a verifier in miniature, §8), hard-capped at `CORRECTION_RETRY_CAP`; costs from every pass are **summed** into the exact figure shown. No validation model configured → no correction spend, issues surfaced directly. Whatever survives the cap commits anyway (the user paid for it) with `validated: false` — a ⚠ badge on the frame and the issue list in chat. A7: targeted refinements get a line-survival check; a rewrite above threshold is a surfaced *warning*, never a correction trigger (same instruction → same result → wasted money). Direct edits re-validate locally (free).
+
+**ADR-002 scripts-enabled commit path** is implemented and deliberately dormant: a *validated* committed artifact containing `<script>` renders as its own document (inline scripts nonce-injected — `src/webview/canvas/commitRender.ts`) inside the unchanged sandbox + CSP. In v0.1 the validator rejects all scripts, so nothing reaches it; the hostile fixture can never validate (tested), and streaming always uses the stripping morph renderer.
+
 ## Design-system grounding (M1 item 5)
 
 “Extract Design System” (explicit, local, free, cancellable) scans the workspace heuristically — `:root`/`html` custom properties, a **static** lift of classic `tailwind.config.*` theme values (workspace code is never executed), and a component inventory with props and cross-file usage counts — and persists to `.design/system/` via the SystemStore. When `tokens.css` exists, generation and refinement prepend `prompts/grounding.md` + the token block (as fenced data) to the system prompt, so artifacts consume the repo's real tokens instead of inventing a palette. Drift: the manifest records source hashes; the canvas re-checks on open and per generation and shows a non-blocking “may be stale” hint — re-extraction is never silent (§6). Model-written component notes are deferred: they'd be an API call and need explicit user action (P3).
@@ -82,4 +93,4 @@ The **design budget for activation is ≤500ms** with no work before the first c
 | P7 one-minute audit | PRIVACY-drift check inside `allowlist.test.ts` |
 | §4 dependency budget | `test/invariants/dep-budget.test.ts` |
 
-Not yet built (M1 items 2+): DocumentStore, chat panel, direct editing, DesignSystemExtractor, Validator, scaffolds copy-in, CostLedger, export/handoff, eval harness runner. See BUILD_BRIEF.md §11.
+M1 backlog status: items 1–10 implemented (model catalog, DocumentStore/frames, chat+refinement, direct editing, extractor+grounding, validator+corrections, scaffolds, cost ledger + status-bar credits, export/handoff, eval harness). Remaining for v0.1 release: human decisions in docs/OPEN_QUESTIONS.md and the launch-readiness items from the item-10 review.

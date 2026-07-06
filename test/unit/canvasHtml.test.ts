@@ -30,6 +30,10 @@ describe('canvas chrome', () => {
     expect(html).toContain('local and free');
   });
 
+  it('shows the active model + pricing at the point of spend (item-1 follow-up)', () => {
+    expect(html).toContain('id="model-note"');
+  });
+
   it('ships the direct-edit toggle labeled as local and free (M1 item 4, P4)', () => {
     const button = html.match(/<button id="edit-text"[^>]*>/);
     expect(button).not.toBeNull();
@@ -45,7 +49,7 @@ describe('canvas chrome', () => {
 
   it('ships the frame board and the frame clone template', () => {
     expect(html).toContain('id="board"');
-    expect(html).toContain('<template id="frame-template">');
+    expect(html).toContain('<template id="frame-template"');
     expect(html.match(/<iframe/g)!.length).toBe(1); // only the template's
   });
 });
