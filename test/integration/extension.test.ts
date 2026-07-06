@@ -27,6 +27,7 @@ suite('underpainting activation', () => {
       'underpainting.clearApiKey',
       'underpainting.selectGenerationModel',
       'underpainting.selectValidationModel',
+      'underpainting.extractDesignSystem',
     ]) {
       assert.ok(commands.includes(id), `missing command ${id}`);
     }

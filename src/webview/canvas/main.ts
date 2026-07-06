@@ -441,6 +441,22 @@ window.addEventListener('message', (event: MessageEvent) => {
         setStatus('No API key set — run “Underpainting: Set OpenRouter API Key”. The canvas stays read-only until then.');
       }
       break;
+    case 'systemState': {
+      const note = document.getElementById('system-note') as HTMLDivElement;
+      if (message.stale) {
+        note.className = 'stale';
+        note.textContent =
+          '⚠ Design system may be stale — its source files changed. Run “Underpainting: Extract Design System” to refresh (local, free).';
+      } else if (message.tokensPresent) {
+        note.className = '';
+        note.textContent = `Grounded in your design system: ${message.tokenCount} tokens from .design/system/.`;
+      } else {
+        note.className = '';
+        note.textContent =
+          'No design system extracted yet — run “Underpainting: Extract Design System” to ground generations in your repo’s tokens (local, free).';
+      }
+      break;
+    }
     case 'streamStart': {
       setGenerating(true);
       setStatus('Generating…');

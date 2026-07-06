@@ -10,6 +10,8 @@ import { createHostPoster } from './poster';
 import { buildCanvasHtml } from './canvasHtml';
 import { DESIGN_DIR } from '../store/writeScope';
 import { DocumentStore, type VersionMeta } from '../store/DocumentStore';
+import { SystemStore } from '../store/SystemStore';
+import { checkDrift } from '../extractor/DesignSystemExtractor';
 
 export interface CanvasDeps {
   client: OpenRouterClient;
@@ -18,6 +20,7 @@ export interface CanvasDeps {
   redactor: SecretRedactor;
   loadCorePrompt: () => Promise<string>;
   loadRefineRecipe: () => Promise<string>;
+  loadGroundingPreamble: () => Promise<string>;
   getGenerationModel: () => string | undefined;
   onModelUnavailable: (modelId: string) => void;
 }
@@ -82,6 +85,26 @@ export class CanvasPanel {
     const post = createHostPoster((m) => void this.panel.webview.postMessage(m), deps.redactor);
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     this.store = workspaceRoot ? new DocumentStore(workspaceRoot) : null;
+    const systemStore = workspaceRoot ? new SystemStore(workspaceRoot) : null;
+
+    // Cheap drift check (§6): rehash the extractor's recorded sources and
+    // surface a non-blocking hint. Fire-and-forget; never blocks, never
+    // re-extracts silently. Runs on canvas open and before each generation.
+    const postSystemState = async (): Promise<void> => {
+      if (!systemStore || !workspaceRoot) return;
+      const manifest = await systemStore.readManifest();
+      if (!manifest) {
+        post({ type: 'systemState', tokensPresent: false, tokenCount: 0, stale: false });
+        return;
+      }
+      const stale = await checkDrift(workspaceRoot, manifest.sources);
+      post({
+        type: 'systemState',
+        tokensPresent: manifest.stats.tokenCount > 0,
+        tokenCount: manifest.stats.tokenCount,
+        stale,
+      });
+    };
 
     this.orchestrator = new Orchestrator({
       client: deps.client,
@@ -89,6 +112,8 @@ export class CanvasPanel {
       logger: deps.logger,
       loadCorePrompt: deps.loadCorePrompt,
       loadRefineRecipe: deps.loadRefineRecipe,
+      loadGroundingPreamble: deps.loadGroundingPreamble,
+      loadGroundingTokens: async () => (systemStore ? systemStore.readTokensCss() : null),
       getGenerationModel: deps.getGenerationModel,
       onModelUnavailable: deps.onModelUnavailable,
       post,
@@ -115,10 +140,14 @@ export class CanvasPanel {
             void this.postFrames(post, null).catch((err) =>
               deps.logger.error(`frame index load failed: ${formatError(err)}`),
             );
+            void postSystemState().catch((err) =>
+              deps.logger.error(`system drift check failed: ${formatError(err)}`),
+            );
             break;
           case 'generate':
             // Explicit user action → the only path to an API call (P3).
             void this.orchestrator.generate(message.prompt);
+            void postSystemState().catch(() => undefined);
             break;
           case 'refine':
             // Refinement targets the selected frame's snapshot (A7, ADR-009).

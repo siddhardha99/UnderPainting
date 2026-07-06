@@ -83,6 +83,16 @@ export const hostToWebviewSchema = z.discriminatedUnion('type', [
     .strict(),
   // Snapshot content for one frame, in response to requestFrame.
   z.object({ type: z.literal('frameContent'), id: frameId, html: z.string() }).strict(),
+  // Design-system grounding state (M1 item 5): shown as a non-blocking hint.
+  // Re-extraction is never silent (§6) — the user runs the command.
+  z
+    .object({
+      type: z.literal('systemState'),
+      tokensPresent: z.boolean(),
+      tokenCount: z.number(),
+      stale: z.boolean(),
+    })
+    .strict(),
 ]);
 export type HostToWebview = z.infer<typeof hostToWebviewSchema>;
 

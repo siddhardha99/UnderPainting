@@ -12,6 +12,7 @@ function makeDeps(options: {
   fetchFn: typeof fetch;
   model?: string | undefined | 'unset';
   withCommit?: boolean;
+  groundingTokens?: string;
 }) {
   const backing = new Map<string, string>();
   const secrets: SecretStorageLike = {
@@ -31,6 +32,8 @@ function makeDeps(options: {
     logger,
     loadCorePrompt: async () => 'core prompt',
     loadRefineRecipe: async () => 'refine recipe',
+    loadGroundingPreamble: async () => 'grounding preamble',
+    loadGroundingTokens: async () => options.groundingTokens ?? null,
     getGenerationModel: () => (options.model === 'unset' ? undefined : (options.model ?? 'test/model')),
     onModelUnavailable: (id) => unavailableModels.push(id),
     post: (m) => posted.push(m),
@@ -196,6 +199,29 @@ describe('Orchestrator (P3: user money, explicit actions only)', () => {
     await failed.ready;
     await failed.orchestrator.generate('will fail');
     expect(failed.commits).toHaveLength(0);
+  });
+
+  it('grounds the system prompt in workspace tokens when they exist (M1 item 5)', async () => {
+    const systems: string[] = [];
+    const fetchFn = async (_url: RequestInfo | URL, init?: RequestInit) => {
+      systems.push(JSON.parse(String(init!.body)).messages[0].content);
+      return sse(['data: [DONE]\n\n']);
+    };
+    const grounded = makeDeps({
+      withKey: true,
+      groundingTokens: ':root { --brand: #123456; }',
+      fetchFn: fetchFn as typeof fetch,
+    });
+    await grounded.ready;
+    await grounded.orchestrator.generate('a card');
+    expect(systems[0]).toContain('core prompt');
+    expect(systems[0]).toContain('grounding preamble');
+    expect(systems[0]).toContain('--brand: #123456;');
+
+    const ungrounded = makeDeps({ withKey: true, fetchFn: fetchFn as typeof fetch });
+    await ungrounded.ready;
+    await ungrounded.orchestrator.generate('a card');
+    expect(systems[1]).toBe('core prompt'); // no grounding section at all
   });
 
   it('refine sends core+recipe as system, artifact-as-data + instruction as user (A7/§8)', async () => {

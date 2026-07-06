@@ -154,6 +154,8 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     #zoom-level { font-size: 11px; min-width: 4ch; text-align: center; opacity: .8; }
     #status { padding: 4px 8px; font-size: 12px; min-height: 1.2em; flex: none; }
     #status.error { color: var(--vscode-errorForeground); }
+    #system-note { padding: 0 8px 4px; font-size: 11px; opacity: .75; flex: none; }
+    #system-note.stale { color: var(--vscode-editorWarning-foreground, #cca700); opacity: 1; }
 
     #board {
       flex: 1; overflow: auto; padding: 16px;
@@ -223,6 +225,7 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
         </div>
       </div>
       <div id="status" role="status"></div>
+      <div id="system-note" role="status"></div>
       <div id="board" role="list" aria-label="Design frames"></div>
     </main>
   </div>
