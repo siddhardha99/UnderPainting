@@ -46,6 +46,10 @@ Canvas Webview (sandboxed)                    src/webview/canvas/
 
 Cost is read from OpenRouter's `usage` accounting on the final SSE frame (requested via `usage: {include: true}`); if absent, one follow-up `GET /api/v1/generation` reads the recorded cost (bounded: capped attempts, per-attempt timeout). It is never estimated.
 
+## Chat + refinement (M1 item 3)
+
+The chat sidebar drives both entry points: **New design** (core prompt) and **Refine selected** (core prompt + `prompts/refine.md`, loaded per-invocation per §8). Refinement sends the selected frame's snapshot as fenced data with one instruction; the recipe requires untouched content to survive character-for-character (A7 — deterministic enforcement arrives with the Validator, item 6). The result commits as a **new** version/frame; history is never rewritten. Chat history is *derived* from the version list (one exchange per frame: prompt → model/cost), so it survives webview reloads for free; only the in-flight exchange is local state. Per-request cost shows inline in each result bubble.
+
 ## Model selection (M1 item 1)
 
 There are **no hardcoded model IDs**. The generation and validation models are user settings (`underpainting.generationModel` / `underpainting.validationModel`), chosen from the **live catalog** (`GET /api/v1/models`) via the Select-Model commands, with per-million-token pricing displayed in the picker. The catalog is fetched only on those explicit user actions (P3). When OpenRouter rejects the configured model mid-generation (deprecated/renamed), the host fetches the catalog and offers ranked equivalents (`src/host/models/catalog.ts`) — a one-click switch the user confirms, never a silent substitution (§9). The validation model is consumed by the correction loop when the Validator lands (M1 item 6).
