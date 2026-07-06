@@ -7,6 +7,8 @@ import {
 } from '../../shared/messages';
 import { spliceTextEdit } from './spliceText';
 import { committedSrcdoc, needsScriptRender } from './commitRender';
+import { fieldsToAsk, normalizeAnswers } from '../../shared/clarify';
+import type { Clarifications } from '../../shared/messages';
 import {
   applyFrames,
   endPending,
@@ -81,6 +83,10 @@ let ephemeral: EphemeralExchange | null = null;
 /** Active direct-edit session (M1 item 4) — entirely local until Done saves one snapshot. */
 let editSession: { frameId: string; dirty: boolean; editCount: number } | null = null;
 const editButton = document.getElementById('edit-text') as HTMLButtonElement;
+/** Clarify-before-spend (v0.2 item 1): the prompt awaiting the one optional round. */
+let pendingClarifyPrompt: string | null = null;
+let groundingTokensPresent = false;
+const clarifyPanel = document.getElementById('clarify') as HTMLDivElement;
 
 function send(message: WebviewToHost): void {
   vscode.postMessage(webviewToHostSchema.parse(message));
@@ -100,6 +106,9 @@ function setGenerating(generating: boolean): void {
 
 function setMode(next: 'new' | 'refine'): void {
   mode = next;
+  if (next === 'refine' && pendingClarifyPrompt) {
+    closeClarifyForm(); // clarify is for new designs only
+  }
   modeNewButton.setAttribute('aria-checked', String(mode === 'new'));
   modeRefineButton.setAttribute('aria-checked', String(mode === 'refine'));
   promptInput.placeholder =
@@ -490,6 +499,7 @@ window.addEventListener('message', (event: MessageEvent) => {
       break;
     }
     case 'systemState': {
+      groundingTokensPresent = message.tokensPresent;
       const note = document.getElementById('system-note') as HTMLDivElement;
       if (message.stale) {
         note.className = 'stale';
@@ -595,6 +605,96 @@ window.addEventListener('message', (event: MessageEvent) => {
   }
 });
 
+// ---------------------------------------------- clarify-before-spend (free)
+
+/**
+ * Show the one optional clarify round: only unanswered fields appear (the
+ * A6-style licensing logic in shared/clarify.ts), the form is deterministic
+ * and local (free, P3/P4), and it never appears twice for a prompt. Returns
+ * false when nothing is worth asking.
+ */
+function openClarifyForm(prompt: string): boolean {
+  const fields = fieldsToAsk(prompt, groundingTokensPresent);
+  // Constraints alone isn't worth an interruption — the prompt was thorough.
+  if (fields.length <= 1) return false;
+  pendingClarifyPrompt = prompt;
+  for (const field of clarifyPanel.querySelectorAll<HTMLElement>('.clarify-field')) {
+    field.hidden = !fields.includes(field.dataset['field'] as ReturnType<typeof fieldsToAsk>[number]);
+  }
+  clarifyPanel.hidden = false;
+  generateButton.disabled = true;
+  setStatus('Optional choices below — answering is free; only Generate spends.');
+  return true;
+}
+
+function closeClarifyForm(): void {
+  pendingClarifyPrompt = null;
+  clarifyPanel.hidden = true;
+  generateButton.disabled = false;
+  // Reset transient inputs so the next round starts clean.
+  for (const button of clarifyPanel.querySelectorAll<HTMLButtonElement>('[aria-pressed], [aria-checked]')) {
+    button.setAttribute(button.hasAttribute('aria-pressed') ? 'aria-pressed' : 'aria-checked', 'false');
+  }
+  for (const input of clarifyPanel.querySelectorAll<HTMLInputElement>('input')) {
+    input.value = '';
+  }
+  (document.getElementById('clarify-variations') as HTMLSelectElement).value = '1';
+}
+
+function collectClarifyAnswers(): Clarifications | undefined {
+  const artifactType = clarifyPanel
+    .querySelector<HTMLButtonElement>('[data-field="artifactType"] button[aria-checked="true"]')
+    ?.dataset['value'] as 'component' | 'page' | undefined;
+  const chips = [...clarifyPanel.querySelectorAll<HTMLButtonElement>('#clarify-style-chips button[aria-pressed="true"]')]
+    .map((b) => b.textContent ?? '')
+    .filter(Boolean);
+  const styleText = (document.getElementById('clarify-style-text') as HTMLInputElement).value.trim();
+  const style = [...chips, styleText].filter(Boolean).join(', ');
+  return normalizeAnswers({
+    artifactType,
+    style,
+    colors: (document.getElementById('clarify-colors') as HTMLInputElement).value,
+    variations: Number((document.getElementById('clarify-variations') as HTMLSelectElement).value),
+    constraints: (document.getElementById('clarify-constraints') as HTMLInputElement).value,
+  });
+}
+
+function dispatchGenerate(prompt: string, clarifications: Clarifications | undefined): void {
+  ephemeral = { userText: prompt, status: 'generating' };
+  send(clarifications ? { type: 'generate', prompt, clarifications } : { type: 'generate', prompt });
+  promptInput.value = '';
+  renderChat();
+}
+
+for (const group of clarifyPanel.querySelectorAll<HTMLElement>('[role="radiogroup"]')) {
+  for (const button of group.querySelectorAll('button')) {
+    button.addEventListener('click', () => {
+      for (const other of group.querySelectorAll('button')) {
+        other.setAttribute('aria-checked', String(other === button && other.getAttribute('aria-checked') !== 'true'));
+      }
+    });
+  }
+}
+for (const chip of clarifyPanel.querySelectorAll<HTMLButtonElement>('#clarify-style-chips button')) {
+  chip.setAttribute('aria-pressed', 'false');
+  chip.addEventListener('click', () =>
+    chip.setAttribute('aria-pressed', String(chip.getAttribute('aria-pressed') !== 'true')),
+  );
+}
+document.getElementById('clarify-send')!.addEventListener('click', () => {
+  if (!pendingClarifyPrompt) return;
+  const prompt = pendingClarifyPrompt;
+  const answers = collectClarifyAnswers();
+  closeClarifyForm();
+  dispatchGenerate(prompt, answers); // the explicit paid action (P3)
+});
+document.getElementById('clarify-skip')!.addEventListener('click', () => {
+  if (!pendingClarifyPrompt) return;
+  const prompt = pendingClarifyPrompt;
+  closeClarifyForm();
+  dispatchGenerate(prompt, undefined);
+});
+
 // ------------------------------------------------------------------ bus out
 
 generateButton.addEventListener('click', () => {
@@ -617,12 +717,13 @@ generateButton.addEventListener('click', () => {
     }
     ephemeral = { userText: prompt, status: 'generating' };
     send({ type: 'refine', frameId: target, instruction: prompt });
+    promptInput.value = '';
+    renderChat();
   } else {
-    ephemeral = { userText: prompt, status: 'generating' };
-    send({ type: 'generate', prompt });
+    // One optional, free clarify round for NEW designs only (v0.2 item 1).
+    if (openClarifyForm(prompt)) return;
+    dispatchGenerate(prompt, undefined);
   }
-  promptInput.value = '';
-  renderChat();
 });
 
 cancelButton.addEventListener('click', () => send({ type: 'cancel' }));

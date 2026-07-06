@@ -184,7 +184,7 @@ export class CanvasPanel {
             break;
           case 'generate':
             // Explicit user action → the only path to an API call (P3).
-            void this.orchestrator.generate(message.prompt);
+            void this.orchestrator.generate(message.prompt, message.clarifications);
             void postSystemState().catch(() => undefined);
             break;
           case 'refine':

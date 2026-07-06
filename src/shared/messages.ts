@@ -1,5 +1,17 @@
 import { z } from 'zod';
 
+/** Clarify-before-spend answers (v0.2 item 1) — collected by a local, deterministic form; asking is free. */
+export const clarificationsSchema = z
+  .object({
+    artifactType: z.enum(['component', 'page']).optional(),
+    style: z.string().max(500).optional(),
+    colors: z.string().max(500).optional(),
+    variations: z.number().int().min(1).max(4).optional(),
+    constraints: z.string().max(2000).optional(),
+  })
+  .strict();
+export type Clarifications = z.infer<typeof clarificationsSchema>;
+
 /**
  * The host↔webview message bus contract. Both sides validate every message
  * against these schemas (invariant P6). All object schemas are `.strict()`
@@ -12,7 +24,13 @@ const frameId = z.string().min(1).max(64);
 export const webviewToHostSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ready') }).strict(),
   // 'generate' and 'refine' are the explicit user actions behind every API call (P3).
-  z.object({ type: z.literal('generate'), prompt: z.string().min(1).max(20_000) }).strict(),
+  z
+    .object({
+      type: z.literal('generate'),
+      prompt: z.string().min(1).max(20_000),
+      clarifications: clarificationsSchema.optional(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('refine'),

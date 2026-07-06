@@ -132,6 +132,29 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     #model-note { font-size: 11px; opacity: .85; font-weight: 600; }
     #paid-note { font-size: 10px; opacity: .7; }
 
+    /* Clarify-before-spend form (v0.2 item 1) — local & free by construction. */
+    #clarify { display: flex; flex-direction: column; gap: 8px; padding: 8px; border: 1px solid var(--vscode-focusBorder, #007fd4); border-radius: 4px; }
+    #clarify[hidden] { display: none; }
+    #clarify-title { font-size: 11px; font-weight: 600; }
+    .clarify-field { display: flex; flex-direction: column; gap: 3px; }
+    .clarify-field[hidden] { display: none; }
+    .clarify-field label { font-size: 10px; opacity: .75; text-transform: uppercase; letter-spacing: .04em; }
+    .clarify-field input, .clarify-field select {
+      padding: 4px 6px; font-size: 12px; font-family: inherit;
+      color: var(--vscode-input-foreground); background: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 3px; }
+    .chips button, .clarify-field [role="radiogroup"] button {
+      font-size: 11px; padding: 2px 8px;
+      color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
+    }
+    .chips button[aria-pressed="true"], .clarify-field [role="radiogroup"] button[aria-checked="true"] {
+      color: var(--vscode-button-foreground); background: var(--vscode-button-background);
+    }
+    #clarify-send { flex: 1; color: var(--vscode-button-foreground); background: var(--vscode-button-background); font-weight: 600; }
+    #clarify-skip { color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); }
+
     /* ------------------------------------------------ board side */
     #main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
     #toolbar {
@@ -201,6 +224,40 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
           <button id="mode-refine" role="radio" aria-checked="false" title="Change only what you ask on the selected frame — one paid API call">Refine selected</button>
         </div>
         <textarea id="prompt" placeholder="Describe the UI to generate…" aria-label="Design prompt"></textarea>
+        <div id="clarify" hidden>
+          <div id="clarify-title">Quick choices — answering is local &amp; free; only Generate spends</div>
+          <div class="clarify-field" data-field="artifactType" hidden>
+            <label>What is it?</label>
+            <div role="radiogroup" aria-label="Artifact type">
+              <button data-value="component" role="radio" aria-checked="false">Component</button>
+              <button data-value="page" role="radio" aria-checked="false">Full page</button>
+            </div>
+          </div>
+          <div class="clarify-field" data-field="style" hidden>
+            <label>Style direction</label>
+            <div class="chips" id="clarify-style-chips">
+              <button>minimal</button><button>bold</button><button>playful</button>
+              <button>corporate</button><button>elegant</button><button>editorial</button>
+            </div>
+            <input id="clarify-style-text" placeholder="or describe the feel in your own words…">
+          </div>
+          <div class="clarify-field" data-field="colors" hidden>
+            <label>Brand colors (optional)</label>
+            <input id="clarify-colors" placeholder="#0ea5e9, warm neutrals, …">
+          </div>
+          <div class="clarify-field" data-field="variations" hidden>
+            <label>Variations in one document</label>
+            <select id="clarify-variations"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+          </div>
+          <div class="clarify-field" data-field="constraints">
+            <label>Constraints (optional)</label>
+            <input id="clarify-constraints" placeholder="anything the design must respect…">
+          </div>
+          <div class="compose-row">
+            <button id="clarify-send" title="One paid API request, with your answers folded in">Generate with these&nbsp;·&nbsp;paid</button>
+            <button id="clarify-skip" title="One paid API request, prompt as written">Just generate&nbsp;·&nbsp;paid</button>
+          </div>
+        </div>
         <div class="compose-row">
           <button id="generate" title="Sends one request to OpenRouter using your key">Send&nbsp;·&nbsp;paid</button>
           <button id="cancel" disabled>Cancel</button>

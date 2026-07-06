@@ -41,6 +41,15 @@ describe('canvas chrome', () => {
     expect(button![0]).toContain('no API call');
   });
 
+  it('ships the clarify form, hidden by default, with per-field visibility hooks (v0.2 item 1)', () => {
+    expect(html).toContain('<div id="clarify" hidden>');
+    for (const field of ['artifactType', 'style', 'colors', 'variations', 'constraints']) {
+      expect(html).toContain(`data-field="${field}"`);
+    }
+    expect(html).toContain('id="clarify-skip"'); // always skippable, one click
+    expect(html).toContain('local &amp; free; only Generate spends'); // P4 labeling
+  });
+
   it('ships the chat sidebar with the new/refine mode toggle (M1 item 3)', () => {
     for (const id of ['chat', 'chat-log', 'mode-new', 'mode-refine', 'prompt', 'generate', 'cancel']) {
       expect(html).toContain(`id="${id}"`);

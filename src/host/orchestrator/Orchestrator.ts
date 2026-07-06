@@ -1,4 +1,5 @@
-import type { HostToWebview } from '../../shared/messages';
+import type { Clarifications, HostToWebview } from '../../shared/messages';
+import { foldClarifications } from '../../shared/clarify';
 import type { KeyVault } from '../keyvault/KeyVault';
 import { HttpError, type OpenRouterClient } from '../client/OpenRouterClient';
 import type { Logger } from '../logging/redact';
@@ -84,6 +85,7 @@ export interface OrchestratorDeps {
     completionTokens: number | null;
     validated: boolean;
     issues: string[];
+    clarifications?: Clarifications;
   }) => Promise<void>;
 }
 
@@ -94,6 +96,8 @@ interface RunRequest {
   user: string;
   /** Refinement base for the A7 diff-minimality warning. */
   refineBase?: string;
+  /** Clarify-form answers, recorded in the version manifest (v0.2 item 1). */
+  clarifications?: Clarifications;
   /** Wraps the streamed fragment into the scaffold shell (A5); identity for refinements. */
   assemble?: (fragment: string) => string;
   kind: 'generation' | 'refinement';
@@ -109,13 +113,17 @@ export class Orchestrator {
   }
 
   /** Fresh design from a prompt, grounded in the workspace's extracted tokens when they exist. */
-  async generate(userPrompt: string): Promise<void> {
+  async generate(userPrompt: string, clarifications?: Clarifications): Promise<void> {
     await this.run(async () => {
       const scaffold = await this.deps.loadPageScaffold?.();
       return {
         prompt: userPrompt,
         system: (await this.deps.loadCorePrompt()) + (await this.groundingSection()),
-        user: userPrompt,
+        // Clarify answers fold in deterministically (v0.2 item 1); the
+        // original prompt is what the version metadata records, the answers
+        // ride separately for reproducibility.
+        user: foldClarifications(userPrompt, clarifications ?? {}),
+        clarifications,
         assemble: scaffold ? (fragment: string) => assembleArtifact(scaffold, fragment) : undefined,
         kind: 'generation' as const,
       };
@@ -309,6 +317,7 @@ export class Orchestrator {
             completionTokens,
             validated: allIssues.length === 0,
             issues: allIssues,
+            clarifications: request.clarifications,
           });
         } catch (err) {
           logger.error(`version commit failed: ${formatError(err)}`);

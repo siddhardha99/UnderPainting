@@ -1,0 +1,1 @@
+(analyzer case — the prompts under test live in case.json's analyzer table)
