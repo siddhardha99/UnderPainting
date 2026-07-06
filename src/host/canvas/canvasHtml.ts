@@ -95,7 +95,17 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     #paid-note { font-size: 11px; opacity: .75; padding: 2px 8px 6px; flex: none; }
     #status { padding: 4px 8px; font-size: 12px; min-height: 1.2em; flex: none; }
     #status.error { color: var(--vscode-errorForeground); }
-    #artifact { flex: 1; width: 100%; border: none; background: #ffffff; }
+    /* Viewport preview toggle — purely local, never an API call (P4). */
+    #viewport { display: flex; gap: 2px; flex: none; }
+    #viewport button {
+      color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
+      font-size: 12px; padding: 4px 10px;
+    }
+    #viewport button[aria-pressed="true"] {
+      color: var(--vscode-button-foreground); background: var(--vscode-button-background);
+    }
+    #stage { flex: 1; display: flex; justify-content: center; overflow: auto; min-height: 0; }
+    #artifact { width: 100%; height: 100%; border: none; background: #ffffff; flex: none; }
   </style>
 </head>
 <body>
@@ -103,10 +113,17 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     <input id="prompt" type="text" placeholder="Describe the UI to generate…" aria-label="Design prompt">
     <button id="generate" title="Sends one request to OpenRouter using your key">Generate&nbsp;·&nbsp;paid</button>
     <button id="cancel" disabled>Cancel</button>
+    <div id="viewport" role="group" aria-label="Preview width — local, free">
+      <button data-width="375" aria-pressed="false" title="375px preview — free, no API call">Mobile</button>
+      <button data-width="768" aria-pressed="false" title="768px preview — free, no API call">Tablet</button>
+      <button data-width="" aria-pressed="true" title="Full-width preview — free, no API call">Desktop</button>
+    </div>
   </div>
   <div id="paid-note">“Generate” makes one paid API request with your OpenRouter key. Everything else on this canvas is local and free.</div>
   <div id="status" role="status"></div>
-  <iframe id="artifact" sandbox="allow-scripts" srcdoc="${srcdoc}" title="Generated design artifact"></iframe>
+  <div id="stage">
+    <iframe id="artifact" sandbox="allow-scripts" srcdoc="${srcdoc}" title="Generated design artifact"></iframe>
+  </div>
   <script nonce="${o.nonce}" src="${o.canvasScriptUri}"></script>
 </body>
 </html>`;
