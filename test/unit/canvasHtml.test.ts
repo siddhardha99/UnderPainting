@@ -14,9 +14,15 @@ describe('canvas chrome', () => {
     expect(group).not.toBeNull();
     expect(group![0]).toContain('data-width="375"');
     expect(group![0]).toContain('data-width="768"');
-    expect(group![0]).toContain('data-width=""');
+    expect(group![0]).toContain('data-width="1280"');
     // Exactly one width is active by default.
     expect(group![0].match(/aria-pressed="true"/g)!.length).toBe(1);
+  });
+
+  it('offers zoom and fit controls (local/free, P4)', () => {
+    for (const id of ['zoom-in', 'zoom-out', 'zoom-fit', 'zoom-level']) {
+      expect(html).toContain(`id="${id}"`);
+    }
   });
 
   it('labels the free/paid boundary unambiguously (P4)', () => {
@@ -24,7 +30,9 @@ describe('canvas chrome', () => {
     expect(html).toContain('local and free');
   });
 
-  it('keeps a single artifact iframe inside the stage', () => {
-    expect(html.match(/<iframe/g)!.length).toBe(1);
+  it('ships the frame board and the frame clone template', () => {
+    expect(html).toContain('id="board"');
+    expect(html).toContain('<template id="frame-template">');
+    expect(html.match(/<iframe/g)!.length).toBe(1); // only the template's
   });
 });

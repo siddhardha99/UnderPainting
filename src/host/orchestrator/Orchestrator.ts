@@ -33,6 +33,19 @@ export interface OrchestratorDeps {
   onModelUnavailable?: (modelId: string) => void;
   /** Posts to the webview; the poster validates and redacts (see createHostPoster). */
   post: (message: HostToWebview) => void;
+  /**
+   * Persist a COMPLETE generation (P5, commit-only-complete-states): called
+   * strictly after the stream finishes successfully and never on cancel or
+   * error. Undefined/null-returning when there is no workspace to write to.
+   */
+  commit?: (result: {
+    html: string;
+    prompt: string;
+    model: string;
+    costUsd: number | null;
+    promptTokens: number | null;
+    completionTokens: number | null;
+  }) => Promise<void>;
 }
 
 export class Orchestrator {
@@ -115,7 +128,24 @@ export class Orchestrator {
         }
       }
 
-      post({ type: 'streamChunk', html: extractHtml(result.text) });
+      const finalHtml = extractHtml(result.text);
+      post({ type: 'streamChunk', html: finalHtml });
+      // Commit before streamDone so the webview can adopt its streaming
+      // frame when the 'frames' message (sent inside commit) arrives first.
+      if (this.deps.commit) {
+        try {
+          await this.deps.commit({
+            html: finalHtml,
+            prompt: userPrompt,
+            model,
+            costUsd,
+            promptTokens,
+            completionTokens,
+          });
+        } catch (err) {
+          logger.error(`version commit failed: ${formatError(err)}`);
+        }
+      }
       post({ type: 'streamDone', costUsd, promptTokens, completionTokens });
       logger.info(
         `this generation: ${costUsd !== null ? `$${costUsd.toFixed(4)}` : 'cost unavailable'}` +

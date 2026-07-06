@@ -10,7 +10,9 @@ Extension Host (Node)
 │     usage/cost readers (stream usage + /generation fallback) · /models catalog
 ├─ Model catalog        src/host/models/      pure helpers: pricing display,
 │     deprecation → suggested-equivalent ranking (never a silent switch)
-├─ Orchestrator         src/host/orchestrator/ prompt → stream → cost
+├─ Orchestrator         src/host/orchestrator/ prompt → stream → cost → commit
+├─ DocumentStore        src/host/store/       immutable version snapshots + manifest;
+│     commits only complete states — cancelled/failed streams never touch disk
 ├─ writeScope guard     src/host/store/       all fs writes confined to .design/ (P5/P9)
 ├─ SecretRedactor       src/host/logging/     every outbound string is scrubbed
 └─ CanvasPanel          src/host/canvas/      webview lifecycle, validated poster
@@ -20,10 +22,16 @@ Extension Host (Node)
 Canvas Webview (sandboxed)                    src/webview/canvas/
 ├─ strict CSP: default-src 'none', nonce-only scripts, no connect-src
 ├─ localResourceRoots: extension dist/webview + workspace .design/ only
-└─ nested artifact <iframe sandbox="allow-scripts">  src/webview/artifact/
-      opaque origin (no allow-same-origin) — cannot touch canvas chrome or VS Code API
-      srcdoc bootstrap receives {patch, html} messages and morphs the DOM per chunk
-      defense-in-depth sanitizer strips scripts / on* attrs / javascript: URLs
+└─ frame board (ADR-009)                       src/webview/canvas/frameState.ts
+      every version is a titled frame (model — cost) in a wrapping flow layout;
+      zoom/fit controls; click to select; one-click restore; all local + free (P4)
+      each frame = nested <iframe sandbox="allow-scripts">   src/webview/artifact/
+        opaque origin (no allow-same-origin) — cannot touch canvas chrome or VS Code API
+        cloned from the single <template> pinned in static HTML (CSP test asserts it)
+        srcdoc bootstrap receives {patch, html} messages and morphs the DOM per chunk
+        defense-in-depth sanitizer strips scripts / on* attrs / javascript: URLs
+      live-iframe budget: only the selected + on-screen frames keep live iframes;
+      off-screen frames drop to placeholders and re-render from .design/ on return
 ```
 
 ## Trust boundaries
