@@ -36,6 +36,10 @@ Canvas Webview (sandboxed)                    src/webview/canvas/
 
 Cost is read from OpenRouter's `usage` accounting on the final SSE frame (requested via `usage: {include: true}`); if absent, one follow-up `GET /api/v1/generation` reads the recorded cost. It is never estimated.
 
+## Activation budget
+
+The **design budget for activation is ≤500ms** with no work before the first command (brief §10.1): `activate()` only registers commands; the output channel, client, and prompt file are created lazily on first use. The integration test asserts `<1500ms` — that number is a **flake-tolerant regression tripwire for shared CI runners, not the spec**. Treat any activation-time regression against the 500ms design budget as a bug even while CI stays green (OPEN_QUESTIONS #10 resolution).
+
 ## Invariants → tests
 
 | Invariant | Test |
