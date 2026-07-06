@@ -23,6 +23,7 @@ interface Services {
   logger: Logger;
   redactor: SecretRedactor;
   loadCorePrompt: () => Promise<string>;
+  loadRefineRecipe: () => Promise<string>;
 }
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -40,6 +41,8 @@ export function activate(context: vscode.ExtensionContext): void {
         client: new OpenRouterClient(),
         loadCorePrompt: () =>
           fs.readFile(path.join(context.extensionUri.fsPath, 'prompts', 'core.md'), 'utf8'),
+        loadRefineRecipe: () =>
+          fs.readFile(path.join(context.extensionUri.fsPath, 'prompts', 'refine.md'), 'utf8'),
       };
     }
     return services;

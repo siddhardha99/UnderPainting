@@ -6,13 +6,18 @@ import { formatError } from '../logging/redact';
 import { extractHtml } from './extractHtml';
 
 /**
- * One generation at a time: prompt → stream → cost. The model comes from
- * the user's per-task settings (M1 item 1) — there are no hardcoded model
- * IDs anywhere; shipped defaults remain a release-time human decision
+ * One generation at a time: prompt → stream → cost → commit. The model comes
+ * from the user's per-task settings (M1 item 1) — there are no hardcoded
+ * model IDs anywhere; shipped defaults remain a release-time human decision
  * (brief §14).
+ *
+ * Two entry points, both explicit user actions (P3): generate() for a fresh
+ * design, refine() for a targeted change to an existing frame (A7 — the
+ * refinement recipe demands untouched content survive character-for-
+ * character; deterministic enforcement arrives with the Validator, item 6).
  */
 
-/** Bounded correction retries (§9). M0 has no validator yet, but the cap is part of the contract. */
+/** Bounded correction retries (§9). Consumed by the Validator's correction loop (M1 item 6). */
 export const CORRECTION_RETRY_CAP = 2;
 
 /** Throttle for streamChunk posts to the webview; the final state is always posted. */
@@ -23,6 +28,8 @@ export interface OrchestratorDeps {
   keyVault: KeyVault;
   logger: Logger;
   loadCorePrompt: () => Promise<string>;
+  /** The refinement recipe, loaded only for refine() invocations (§8). */
+  loadRefineRecipe: () => Promise<string>;
   /** The user's configured generation model, or undefined when none is chosen yet. */
   getGenerationModel: () => string | undefined;
   /**
@@ -36,7 +43,7 @@ export interface OrchestratorDeps {
   /**
    * Persist a COMPLETE generation (P5, commit-only-complete-states): called
    * strictly after the stream finishes successfully and never on cancel or
-   * error. Undefined/null-returning when there is no workspace to write to.
+   * error. Undefined when there is no workspace to write to.
    */
   commit?: (result: {
     html: string;
@@ -48,6 +55,13 @@ export interface OrchestratorDeps {
   }) => Promise<void>;
 }
 
+interface RunRequest {
+  /** What lands in the version metadata and the chat history. */
+  prompt: string;
+  system: string;
+  user: string;
+}
+
 export class Orchestrator {
   private active: AbortController | null = null;
 
@@ -57,12 +71,33 @@ export class Orchestrator {
     return this.active !== null;
   }
 
-  /**
-   * Runs one generation. Only ever called from an explicit user action —
-   * the Generate button's message (P3). Never called on activation, timers,
-   * or document events.
-   */
+  /** Fresh design from a prompt. */
   async generate(userPrompt: string): Promise<void> {
+    await this.run(async () => ({
+      prompt: userPrompt,
+      system: await this.deps.loadCorePrompt(),
+      user: userPrompt,
+    }));
+  }
+
+  /** Targeted change to an existing artifact (A7). The result is a NEW version — history is never rewritten. */
+  async refine(instruction: string, baseHtml: string): Promise<void> {
+    await this.run(async () => {
+      const [core, recipe] = await Promise.all([
+        this.deps.loadCorePrompt(),
+        this.deps.loadRefineRecipe(),
+      ]);
+      return {
+        prompt: instruction,
+        system: `${core}\n\n${recipe}`,
+        // The artifact rides in the user message as fenced DATA; the recipe
+        // pins the untrusted-content framing (§8/§9 prompt-injection stance).
+        user: `<<<ARTIFACT\n${baseHtml}\nARTIFACT>>>\n\nInstruction: ${instruction}`,
+      };
+    });
+  }
+
+  private async run(buildRequest: () => Promise<RunRequest>): Promise<void> {
     const { client, keyVault, logger, post } = this.deps;
 
     if (this.active) {
@@ -93,7 +128,7 @@ export class Orchestrator {
       return;
     }
 
-    const system = await this.deps.loadCorePrompt();
+    const request = await buildRequest();
     const controller = new AbortController();
     this.active = controller;
     post({ type: 'streamStart' });
@@ -103,8 +138,8 @@ export class Orchestrator {
       const result = await client.streamChat({
         apiKey,
         model,
-        system,
-        user: userPrompt,
+        system: request.system,
+        user: request.user,
         signal: controller.signal,
         onDelta: (accumulated) => {
           const now = Date.now();
@@ -136,7 +171,7 @@ export class Orchestrator {
         try {
           await this.deps.commit({
             html: finalHtml,
-            prompt: userPrompt,
+            prompt: request.prompt,
             model,
             costUsd,
             promptTokens,

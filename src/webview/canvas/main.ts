@@ -19,24 +19,27 @@ import {
  * — and performs no network I/O (P1; the webview CSP has no connect-src).
  * Both directions of the bus are zod-validated (P6).
  *
- * Frame board (ADR-009): each version renders as a titled frame cloned from
- * #frame-template. Only the selected frame and frames on screen keep a live
- * iframe; the rest drop to placeholders and re-request their snapshot from
- * the host when they come back. All board interactions are local and free
- * (P4) — the sole paid action is Generate.
+ * Layout (ADR-009): the chat sidebar drives generation and frame-native
+ * refinement; the board renders versions as titled frames. Only the selected
+ * frame and frames on screen keep a live iframe. All board and chat
+ * interactions are local and free (P4) — the sole paid action is Send.
  */
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 
 const vscode = acquireVsCodeApi();
 
-const promptInput = document.getElementById('prompt') as HTMLInputElement;
+const promptInput = document.getElementById('prompt') as HTMLTextAreaElement;
 const generateButton = document.getElementById('generate') as HTMLButtonElement;
 const cancelButton = document.getElementById('cancel') as HTMLButtonElement;
 const statusLine = document.getElementById('status') as HTMLDivElement;
 const board = document.getElementById('board') as HTMLDivElement;
 const frameTemplate = document.getElementById('frame-template') as HTMLTemplateElement;
 const zoomLevel = document.getElementById('zoom-level') as HTMLSpanElement;
+const chatPanel = document.getElementById('chat') as HTMLElement;
+const chatLog = document.getElementById('chat-log') as HTMLDivElement;
+const modeNewButton = document.getElementById('mode-new') as HTMLButtonElement;
+const modeRefineButton = document.getElementById('mode-refine') as HTMLButtonElement;
 
 const DEFAULT_LOGICAL_WIDTH = 1280;
 const LOGICAL_HEIGHT = 1400;
@@ -60,9 +63,18 @@ interface FrameCard {
   onScreen: boolean;
 }
 
+/** The in-flight (or just-finished-unsaved) exchange, drawn after committed history. */
+interface EphemeralExchange {
+  userText: string;
+  status: 'generating' | 'error' | 'cancelled' | 'unsaved';
+  detail?: string;
+}
+
 let state: BoardState = initialState();
 const cards = new Map<string, FrameCard>();
 let zoom = 0.4;
+let mode: 'new' | 'refine' = 'new';
+let ephemeral: EphemeralExchange | null = null;
 
 function send(message: WebviewToHost): void {
   vscode.postMessage(webviewToHostSchema.parse(message));
@@ -76,6 +88,74 @@ function setStatus(text: string, isError = false): void {
 function setGenerating(generating: boolean): void {
   generateButton.disabled = generating;
   cancelButton.disabled = !generating;
+}
+
+// ------------------------------------------------------------------- chat
+
+function setMode(next: 'new' | 'refine'): void {
+  mode = next;
+  modeNewButton.setAttribute('aria-checked', String(mode === 'new'));
+  modeRefineButton.setAttribute('aria-checked', String(mode === 'refine'));
+  promptInput.placeholder =
+    mode === 'new'
+      ? 'Describe the UI to generate…'
+      : 'Describe the change to the selected frame…';
+}
+modeNewButton.addEventListener('click', () => setMode('new'));
+modeRefineButton.addEventListener('click', () => setMode('refine'));
+document.getElementById('toggle-chat')!.addEventListener('click', () => {
+  chatPanel.hidden = !chatPanel.hidden;
+});
+
+function chatBubble(className: string, text: string): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = `msg ${className}`;
+  el.textContent = text;
+  return el;
+}
+
+/**
+ * Chat history is DERIVED from the version list (one exchange per frame), so
+ * it survives webview reloads for free; only the in-flight exchange is local.
+ */
+function renderChat(): void {
+  chatLog.replaceChildren();
+  for (const frame of state.frames) {
+    chatLog.appendChild(chatBubble('user', frame.prompt));
+    const result = chatBubble('result', '');
+    const cost = document.createElement('span');
+    cost.className = 'cost';
+    cost.textContent = frame.title;
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = frame.subtitle + (frame.isCurrent ? ' · current' : '');
+    result.append(cost, meta);
+    result.addEventListener('click', () => {
+      state = select(state, frame.id);
+      send({ type: 'selectFrame', id: frame.id });
+      render();
+      cards.get(frame.id)?.root.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+    chatLog.appendChild(result);
+  }
+  if (ephemeral) {
+    chatLog.appendChild(chatBubble('user', ephemeral.userText));
+    switch (ephemeral.status) {
+      case 'generating':
+        chatLog.appendChild(chatBubble('result', 'Generating…'));
+        break;
+      case 'error':
+        chatLog.appendChild(chatBubble('error', ephemeral.detail ?? 'Generation failed.'));
+        break;
+      case 'cancelled':
+        chatLog.appendChild(chatBubble('error', 'Cancelled — nothing was saved.'));
+        break;
+      case 'unsaved':
+        chatLog.appendChild(chatBubble('result', ephemeral.detail ?? 'Done (unsaved).'));
+        break;
+    }
+  }
+  chatLog.scrollTop = chatLog.scrollHeight;
 }
 
 // ---------------------------------------------------------------- frames DOM
@@ -198,9 +278,6 @@ function render(): void {
       cards.delete(id);
     }
   }
-  if (state.pendingId === null && cards.has(PENDING_ID) && !state.frames.length) {
-    // keep the unsaved card visible; removal handled in adopt/cleanup paths
-  }
   for (const frame of state.frames) {
     const card = cards.get(frame.id) ?? createCard(frame.id);
     card.title.textContent = frame.title;
@@ -213,6 +290,7 @@ function render(): void {
     syncLiveness(card);
   }
   syncViewportButtons();
+  renderChat();
 }
 
 function adoptPending(newId: string, meta: FrameMeta | undefined): void {
@@ -309,6 +387,7 @@ window.addEventListener('message', (event: MessageEvent) => {
           result.adoptPendingAs,
           message.frames.find((f) => f.id === result.adoptPendingAs),
         );
+        ephemeral = null; // the committed exchange now lives in the derived history
       }
       render();
       break;
@@ -332,7 +411,9 @@ window.addEventListener('message', (event: MessageEvent) => {
       if (orphan) {
         orphan.title.textContent = 'Unsaved';
         orphan.subtitle.textContent = 'open a folder to keep versions';
+        if (ephemeral) ephemeral = { ...ephemeral, status: 'unsaved', detail: `Done — ${cost}, unsaved (open a folder to keep versions).` };
         state = endPending(state);
+        renderChat();
       }
       break;
     }
@@ -344,7 +425,9 @@ window.addEventListener('message', (event: MessageEvent) => {
         card.title.textContent = 'Cancelled';
         card.subtitle.textContent = 'not saved';
       }
+      if (ephemeral) ephemeral = { ...ephemeral, status: 'cancelled' };
       state = endPending(state);
+      renderChat();
       break;
     }
     case 'streamError': {
@@ -356,7 +439,13 @@ window.addEventListener('message', (event: MessageEvent) => {
         card.root.remove();
         cards.delete(PENDING_ID);
       }
+      if (ephemeral) {
+        ephemeral = { ...ephemeral, status: 'error', detail: message.message };
+      } else {
+        ephemeral = { userText: promptInput.value.trim() || '(request)', status: 'error', detail: message.message };
+      }
       state = endPending(state);
+      renderChat();
       break;
     }
   }
@@ -371,16 +460,30 @@ generateButton.addEventListener('click', () => {
     return;
   }
   // This click is the explicit user action behind the API call (P3).
-  send({ type: 'generate', prompt });
+  if (mode === 'refine') {
+    const target = state.selectedId;
+    if (!target || target === PENDING_ID || !state.frames.some((f) => f.id === target)) {
+      setStatus('Select a saved frame to refine, or switch to "New design".', true);
+      return;
+    }
+    ephemeral = { userText: prompt, status: 'generating' };
+    send({ type: 'refine', frameId: target, instruction: prompt });
+  } else {
+    ephemeral = { userText: prompt, status: 'generating' };
+    send({ type: 'generate', prompt });
+  }
+  promptInput.value = '';
+  renderChat();
 });
 
 cancelButton.addEventListener('click', () => send({ type: 'cancel' }));
 
 promptInput.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter' && !generateButton.disabled) {
+  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !generateButton.disabled) {
     generateButton.click();
   }
 });
 
+setMode('new');
 setZoom(zoom);
 send({ type: 'ready' });
