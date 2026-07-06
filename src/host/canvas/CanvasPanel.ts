@@ -14,6 +14,7 @@ import { SystemStore } from '../store/SystemStore';
 import { CostLedger } from '../store/CostLedger';
 import { checkDrift } from '../extractor/DesignSystemExtractor';
 import { validateArtifact } from '../validator/Validator';
+import { TARGET_SIZES } from '../../shared/targetSize';
 
 export interface CanvasDeps {
   client: OpenRouterClient;
@@ -198,7 +199,9 @@ export class CanvasPanel {
                 return;
               }
               const baseHtml = await this.store.readVersion(message.frameId);
-              await this.orchestrator.refine(message.instruction, baseHtml);
+              const { versions } = await this.store.listVersions();
+              const baseSize = versions.find((v) => v.id === message.frameId)?.size;
+              await this.orchestrator.refine(message.instruction, baseHtml, baseSize);
             })().catch((err) => {
               post({ type: 'streamError', message: formatError(err) });
               deps.logger.error(`refine failed: ${formatError(err)}`);
@@ -224,6 +227,7 @@ export class CanvasPanel {
               // Re-validate the edited document (free, local) so the frame's
               // validated badge stays truthful after splices.
               const issues = validateArtifact(message.html).map((i) => `[${i.rule}] ${i.message}`);
+              const { versions: allVersions } = await this.store.listVersions();
               const meta = await this.store.commitVersion({
                 html: message.html,
                 prompt: `Direct text edit (${message.editCount} change${message.editCount === 1 ? '' : 's'})`,
@@ -233,6 +237,7 @@ export class CanvasPanel {
                 completionTokens: null,
                 validated: issues.length === 0,
                 issues,
+                size: allVersions.find((v) => v.id === message.frameId)?.size,
               });
               await this.postFrames(post, meta.id);
             })().catch((err) => deps.logger.error(`edit commit failed: ${formatError(err)}`));
@@ -270,6 +275,7 @@ export class CanvasPanel {
                   completionTokens: null,
                   validated: issues.length === 0,
                   issues,
+                  size: source?.size,
                 });
                 lastId = meta.id;
               }
@@ -322,5 +328,6 @@ function toFrameMeta(v: VersionMeta, currentId: string | null): FrameMeta {
     isCurrent: v.id === currentId,
     validated: v.validated ?? true,
     position: v.position ?? null,
+    size: v.size ?? TARGET_SIZES.desktop,
   };
 }

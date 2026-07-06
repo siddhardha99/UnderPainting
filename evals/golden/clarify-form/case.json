@@ -4,7 +4,7 @@
   "added": "2026-07-06",
   "origin": "v0.2 item 1 — the ask-only-what's-unanswered licensing rule (same logic as A6): a field whose answer is already in the prompt must not be asked.",
   "exercises": [
-    "Deterministic clarify analyzer: prompt-stated answers suppress their fields; grounding tokens suppress the color question; constraints is always offered"
+    "Deterministic clarify analyzer: prompt-stated answers suppress their fields; grounding tokens suppress the color question; target words (mobile/page/button) suppress the viewport question; constraints is always offered"
   ],
   "checks": [
     { "id": "clarify-analyzer", "kind": "deterministic", "note": "assertions in the analyzer table below" }
@@ -13,30 +13,30 @@
     {
       "prompt": "A deep blue pricing page for a note-taking app",
       "groundingTokensPresent": false,
-      "mustNotAsk": ["colors", "artifactType"],
+      "mustNotAsk": ["colors", "target"],
       "mustAsk": ["style"]
     },
     {
       "prompt": "A minimalist hero section, elegant and calm",
       "groundingTokensPresent": false,
       "mustNotAsk": ["style"],
-      "mustAsk": ["colors", "artifactType"]
+      "mustAsk": ["colors", "target"]
     },
     {
       "prompt": "Something for our product",
       "groundingTokensPresent": false,
-      "mustAsk": ["artifactType", "style", "colors", "variations", "constraints"]
+      "mustAsk": ["target", "style", "colors", "variations", "constraints"]
     },
     {
       "prompt": "Something for our product",
       "groundingTokensPresent": true,
       "mustNotAsk": ["colors"],
-      "mustAsk": ["artifactType", "style"]
+      "mustAsk": ["target", "style"]
     },
     {
       "prompt": "3 variations of a bold red signup button",
       "groundingTokensPresent": false,
-      "mustNotAsk": ["variations", "colors", "artifactType", "style"],
+      "mustNotAsk": ["variations", "colors", "target", "style"],
       "mustAsk": ["constraints"]
     }
   ]

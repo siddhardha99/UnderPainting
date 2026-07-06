@@ -11,7 +11,7 @@ import {
 import type { FrameMeta } from '../../src/shared/messages';
 
 function frame(id: string, isCurrent = false): FrameMeta {
-  return { id, title: `t-${id}`, subtitle: `s-${id}`, prompt: `p-${id}`, isCurrent, validated: true, position: null };
+  return { id, title: `t-${id}`, subtitle: `s-${id}`, prompt: `p-${id}`, isCurrent, validated: true, position: null, size: { width: 1440, height: 1400 } };
 }
 
 describe('frame board state (ADR-009)', () => {

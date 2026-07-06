@@ -3,7 +3,7 @@ import { z } from 'zod';
 /** Clarify-before-spend answers (v0.2 item 1) — collected by a local, deterministic form; asking is free. */
 export const clarificationsSchema = z
   .object({
-    artifactType: z.enum(['component', 'page']).optional(),
+    target: z.enum(['component', 'mobile', 'tablet', 'desktop']).optional(),
     style: z.string().max(500).optional(),
     colors: z.string().max(500).optional(),
     variations: z.number().int().min(1).max(4).optional(),
@@ -97,6 +97,8 @@ export const frameMetaSchema = z
     validated: z.boolean(),
     /** Board position from the manifest; null → the webview assigns the default grid slot (2b). */
     position: z.object({ x: z.number(), y: z.number() }).strict().nullable(),
+    /** The frame's design-time viewport (2b revision) — the frame is born at this size. */
+    size: z.object({ width: z.number().min(100), height: z.number().min(100) }).strict(),
   })
   .strict();
 export type FrameMeta = z.infer<typeof frameMetaSchema>;

@@ -9,14 +9,10 @@ const html = buildCanvasHtml({
 });
 
 describe('canvas chrome', () => {
-  it('offers the three viewport preview widths (local/free, P4)', () => {
-    const group = html.match(/<div id="viewport"[\s\S]*?<\/div>/);
-    expect(group).not.toBeNull();
-    expect(group![0]).toContain('data-width="375"');
-    expect(group![0]).toContain('data-width="768"');
-    expect(group![0]).toContain('data-width="1280"');
-    // Exactly one width is active by default.
-    expect(group![0].match(/aria-pressed="true"/g)!.length).toBe(1);
+  it('the post-hoc viewport toggle is gone — size is a design-time property (2b revision)', () => {
+    expect(html).not.toContain('id="viewport"');
+    expect(html).toContain('data-value="mobile"'); // target choices live in the clarify form
+    expect(html).toContain('390×844');
   });
 
   it('offers zoom and fit controls (local/free, P4)', () => {
@@ -43,7 +39,7 @@ describe('canvas chrome', () => {
 
   it('ships the clarify form, hidden by default, with per-field visibility hooks (v0.2 item 1)', () => {
     expect(html).toContain('<div id="clarify" hidden>');
-    for (const field of ['artifactType', 'style', 'colors', 'variations', 'constraints']) {
+    for (const field of ['target', 'style', 'colors', 'variations', 'constraints']) {
       expect(html).toContain(`data-field="${field}"`);
     }
     expect(html).toContain('id="clarify-skip"'); // always skippable, one click

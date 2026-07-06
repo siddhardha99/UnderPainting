@@ -179,16 +179,12 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     #present-title { font-weight: 600; }
     #present-pos { opacity: .75; }
     #present-hint { opacity: .6; font-size: 11px; margin-left: auto; }
-    #present-stage { flex: 1; min-height: 0; background: #ffffff; }
-    #present-stage iframe { width: 100%; height: 100%; border: none; display: block; background: #ffffff; }
+    #present-stage { flex: 1; min-height: 0; display: flex; justify-content: center; background: var(--vscode-editor-background); }
+    #present-stage iframe { height: 100%; border: none; display: block; background: #ffffff; }
 
-    #toggle-chat, #edit-text, #present-button, #viewport button, #zoom button {
+    #toggle-chat, #edit-text, #present-button, #zoom button {
       color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
       font-size: 12px; padding: 4px 10px;
-    }
-    #viewport { display: flex; gap: 2px; flex: none; }
-    #viewport button[aria-pressed="true"] {
-      color: var(--vscode-button-foreground); background: var(--vscode-button-background);
     }
     #zoom { display: flex; gap: 2px; align-items: center; flex: none; }
     #zoom-level { font-size: 11px; min-width: 4ch; text-align: center; opacity: .8; }
@@ -252,11 +248,13 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
         <textarea id="prompt" placeholder="Describe the UI to generate…" aria-label="Design prompt"></textarea>
         <div id="clarify" hidden>
           <div id="clarify-title">Quick choices — answering is local &amp; free; only Generate spends</div>
-          <div class="clarify-field" data-field="artifactType" hidden>
-            <label>What is it?</label>
-            <div role="radiogroup" aria-label="Artifact type">
-              <button data-value="component" role="radio" aria-checked="false">Component</button>
-              <button data-value="page" role="radio" aria-checked="false">Full page</button>
+          <div class="clarify-field" data-field="target" hidden>
+            <label>What is it? (sets the design's canvas size)</label>
+            <div role="radiogroup" aria-label="Target viewport">
+              <button data-value="component" role="radio" aria-checked="false">Component · 800×600</button>
+              <button data-value="mobile" role="radio" aria-checked="false">Mobile · 390×844</button>
+              <button data-value="tablet" role="radio" aria-checked="false">Tablet · 834×1194</button>
+              <button data-value="desktop" role="radio" aria-checked="false">Desktop · 1440×1400</button>
             </div>
           </div>
           <div class="clarify-field" data-field="style" hidden>
@@ -298,11 +296,6 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
         <button id="edit-text" aria-pressed="false" title="Edit text directly on the selected frame — local, free, no API call">Edit text</button>
         <button id="present-button" title="Present the selected frame full-screen (Esc exits, ←/→ steps versions) — local, free">Present</button>
         <span class="spacer"></span>
-        <div id="viewport" role="group" aria-label="Preview width of the selected frame — local, free">
-          <button data-width="375" aria-pressed="false" title="375px preview — free, no API call">Mobile</button>
-          <button data-width="768" aria-pressed="false" title="768px preview — free, no API call">Tablet</button>
-          <button data-width="1280" aria-pressed="true" title="1280px preview — free, no API call">Desktop</button>
-        </div>
         <div id="zoom" role="group" aria-label="Zoom — local, free">
           <button id="zoom-out" title="Zoom out — free">−</button>
           <span id="zoom-level">40%</span>

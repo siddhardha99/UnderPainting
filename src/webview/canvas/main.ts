@@ -75,7 +75,9 @@ interface FrameCard {
   iframeLoaded: boolean;
   /** Latest artifact HTML for this frame; flushed to the iframe once it loads. */
   html: string | null;
-  logicalWidth: number;
+  /** Design-time viewport (2b revision) — the frame is born at this size. */
+  width: number;
+  height: number;
   /** Surface-space position (2b) — from the manifest, or the default grid slot. */
   x: number;
   y: number;
@@ -210,7 +212,8 @@ function createCard(id: string): FrameCard {
     iframe: root.querySelector('iframe'),
     iframeLoaded: false,
     html: null,
-    logicalWidth: DEFAULT_LOGICAL_WIDTH,
+    width: DEFAULT_LOGICAL_WIDTH,
+    height: LOGICAL_HEIGHT,
     x: 0,
     y: 0,
   };
@@ -290,8 +293,8 @@ function updateLiveness(): void {
     id: c.id,
     x: c.x,
     y: c.y,
-    width: c.logicalWidth,
-    height: LOGICAL_HEIGHT,
+    width: c.width,
+    height: c.height,
   }));
   const live = pickLive(boxes, state.selectedId, view);
   if (state.pendingId) live.add(PENDING_ID); // the streaming frame is always live
@@ -337,11 +340,11 @@ function syncLiveness(card: FrameCard, shouldBeLive: boolean): void {
 function applyCardSize(card: FrameCard): void {
   // Cards live at LOGICAL size on the surface; the surface transform does
   // all scaling (2b) — no per-iframe transforms, one composited layer.
-  card.clip.style.width = `${card.logicalWidth}px`;
-  card.clip.style.height = `${LOGICAL_HEIGHT}px`;
+  card.clip.style.width = `${card.width}px`;
+  card.clip.style.height = `${card.height}px`;
   if (card.iframe) {
-    card.iframe.style.width = `${card.logicalWidth}px`;
-    card.iframe.style.height = `${LOGICAL_HEIGHT}px`;
+    card.iframe.style.width = `${card.width}px`;
+    card.iframe.style.height = `${card.height}px`;
   }
 }
 
@@ -359,6 +362,11 @@ function render(): void {
     card.subtitle.textContent = frame.subtitle;
     card.badge.hidden = !frame.isCurrent;
     card.restoreButton.hidden = frame.isCurrent;
+    if (card.width !== frame.size.width || card.height !== frame.size.height) {
+      card.width = frame.size.width;
+      card.height = frame.size.height;
+      applyCardSize(card);
+    }
     const position = frame.position ?? defaultPosition(index, DEFAULT_LOGICAL_WIDTH, LOGICAL_HEIGHT);
     if (!dragState || dragState.card.id !== frame.id) {
       placeCard(card, position.x, position.y);
@@ -375,7 +383,6 @@ function render(): void {
     card.root.classList.toggle('selected', state.selectedId === card.id);
   }
   updateLiveness();
-  syncViewportButtons();
   renderChat();
 }
 
@@ -501,8 +508,8 @@ function centerFrame(id: string): void {
   const card = cards.get(id);
   if (!card) return;
   setView({
-    panX: board.clientWidth / 2 - (card.x + card.logicalWidth / 2) * zoom,
-    panY: board.clientHeight / 2 - (card.y + LOGICAL_HEIGHT / 2) * zoom,
+    panX: board.clientWidth / 2 - (card.x + card.width / 2) * zoom,
+    panY: board.clientHeight / 2 - (card.y + card.height / 2) * zoom,
     zoom,
   });
 }
@@ -518,7 +525,7 @@ document.getElementById('zoom-fit')!.addEventListener('click', () => {
   if (!target) return;
   setView(
     fitFrame(
-      { x: target.x, y: target.y, width: target.logicalWidth, height: LOGICAL_HEIGHT },
+      { x: target.x, y: target.y, width: target.width, height: target.height },
       board.clientWidth,
       board.clientHeight,
     ),
@@ -638,29 +645,6 @@ window.addEventListener('mouseup', () => {
     dragState = null;
   }
 });
-
-// ------------------------------------------------- viewport width (selected)
-
-const viewportButtons = Array.from(
-  document.querySelectorAll<HTMLButtonElement>('#viewport button'),
-);
-for (const button of viewportButtons) {
-  button.addEventListener('click', () => {
-    const card = state.selectedId ? cards.get(state.selectedId) : undefined;
-    if (!card) return;
-    card.logicalWidth = Number(button.dataset['width']) || DEFAULT_LOGICAL_WIDTH;
-    applyCardSize(card);
-    syncViewportButtons();
-  });
-}
-
-function syncViewportButtons(): void {
-  const card = state.selectedId ? cards.get(state.selectedId) : undefined;
-  const width = card?.logicalWidth ?? DEFAULT_LOGICAL_WIDTH;
-  for (const button of viewportButtons) {
-    button.setAttribute('aria-pressed', String(Number(button.dataset['width']) === width));
-  }
-}
 
 // ------------------------------------------------------------------- bus in
 
@@ -856,6 +840,7 @@ function openPresent(frameId: string): void {
   presentStage.appendChild(iframe);
   presentOverlay.hidden = false;
   loadPresentContent(frameId);
+  sizePresentIframe(frameId);
 }
 
 function closePresent(): void {
@@ -865,9 +850,19 @@ function closePresent(): void {
   presentOverlay.hidden = true;
 }
 
+function sizePresentIframe(frameId: string): void {
+  if (!present) return;
+  const size = state.frames.find((f) => f.id === frameId)?.size;
+  // Present at the design's own width, centered — a mobile screen presents
+  // as a phone-width column, not stretched to the window.
+  present.iframe.style.width = size ? `${size.width}px` : '100%';
+  present.iframe.style.maxWidth = '100%';
+}
+
 function loadPresentContent(frameId: string): void {
   if (!present) return;
   present.frameId = frameId;
+  sizePresentIframe(frameId);
   const meta = state.frames.find((f) => f.id === frameId);
   const index = state.frames.findIndex((f) => f.id === frameId);
   (document.getElementById('present-title') as HTMLSpanElement).textContent = meta?.title ?? '';
@@ -975,16 +970,16 @@ function closeClarifyForm(): void {
 }
 
 function collectClarifyAnswers(): Clarifications | undefined {
-  const artifactType = clarifyPanel
-    .querySelector<HTMLButtonElement>('[data-field="artifactType"] button[aria-checked="true"]')
-    ?.dataset['value'] as 'component' | 'page' | undefined;
+  const target = clarifyPanel
+    .querySelector<HTMLButtonElement>('[data-field="target"] button[aria-checked="true"]')
+    ?.dataset['value'] as Clarifications['target'];
   const chips = [...clarifyPanel.querySelectorAll<HTMLButtonElement>('#clarify-style-chips button[aria-pressed="true"]')]
     .map((b) => b.textContent ?? '')
     .filter(Boolean);
   const styleText = (document.getElementById('clarify-style-text') as HTMLInputElement).value.trim();
   const style = [...chips, styleText].filter(Boolean).join(', ');
   return normalizeAnswers({
-    artifactType,
+    target,
     style,
     colors: (document.getElementById('clarify-colors') as HTMLInputElement).value,
     variations: Number((document.getElementById('clarify-variations') as HTMLSelectElement).value),

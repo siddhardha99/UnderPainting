@@ -1,5 +1,6 @@
 import type { Clarifications, HostToWebview } from '../../shared/messages';
 import { foldClarifications } from '../../shared/clarify';
+import { detectTarget, TARGET_SIZES } from '../../shared/targetSize';
 import type { KeyVault } from '../keyvault/KeyVault';
 import { HttpError, type OpenRouterClient } from '../client/OpenRouterClient';
 import type { Logger } from '../logging/redact';
@@ -86,6 +87,7 @@ export interface OrchestratorDeps {
     validated: boolean;
     issues: string[];
     clarifications?: Clarifications;
+    size?: { width: number; height: number };
   }) => Promise<void>;
 }
 
@@ -98,6 +100,8 @@ interface RunRequest {
   refineBase?: string;
   /** Clarify-form answers, recorded in the version manifest (v0.2 item 1). */
   clarifications?: Clarifications;
+  /** Design-time viewport (2b revision) — recorded with the version; the frame is born at this size. */
+  size?: { width: number; height: number };
   /** Wraps the streamed fragment into the scaffold shell (A5); identity for refinements. */
   assemble?: (fragment: string) => string;
   kind: 'generation' | 'refinement';
@@ -116,14 +120,20 @@ export class Orchestrator {
   async generate(userPrompt: string, clarifications?: Clarifications): Promise<void> {
     await this.run(async () => {
       const scaffold = await this.deps.loadPageScaffold?.();
+      // The target viewport is a DESIGN-TIME property (2b revision): chosen
+      // in the clarify form, detected from the prompt, or desktop — always
+      // resolved before the paid call and recorded with the version.
+      const target = clarifications?.target ?? detectTarget(userPrompt) ?? 'desktop';
+      const effective: Clarifications = { ...clarifications, target };
       return {
         prompt: userPrompt,
         system: (await this.deps.loadCorePrompt()) + (await this.groundingSection()),
         // Clarify answers fold in deterministically (v0.2 item 1); the
         // original prompt is what the version metadata records, the answers
         // ride separately for reproducibility.
-        user: foldClarifications(userPrompt, clarifications ?? {}),
-        clarifications,
+        user: foldClarifications(userPrompt, effective),
+        clarifications: effective,
+        size: TARGET_SIZES[target],
         assemble: scaffold ? (fragment: string) => assembleArtifact(scaffold, fragment) : undefined,
         kind: 'generation' as const,
       };
@@ -144,7 +154,11 @@ export class Orchestrator {
   }
 
   /** Targeted change to an existing artifact (A7). The result is a NEW version — history is never rewritten. */
-  async refine(instruction: string, baseHtml: string): Promise<void> {
+  async refine(
+    instruction: string,
+    baseHtml: string,
+    baseSize?: { width: number; height: number },
+  ): Promise<void> {
     await this.run(async () => {
       const [core, recipe] = await Promise.all([
         this.deps.loadCorePrompt(),
@@ -157,6 +171,7 @@ export class Orchestrator {
         // pins the untrusted-content framing (§8/§9 prompt-injection stance).
         user: `<<<ARTIFACT\n${baseHtml}\nARTIFACT>>>\n\nInstruction: ${instruction}`,
         refineBase: isRedesignInstruction(instruction) ? undefined : baseHtml,
+        size: baseSize ?? TARGET_SIZES.desktop, // refinements inherit the source frame's viewport
         kind: 'refinement' as const,
       };
     });
@@ -318,6 +333,7 @@ export class Orchestrator {
             validated: allIssues.length === 0,
             issues: allIssues,
             clarifications: request.clarifications,
+            size: request.size,
           });
         } catch (err) {
           logger.error(`version commit failed: ${formatError(err)}`);
