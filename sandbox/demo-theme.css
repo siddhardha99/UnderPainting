@@ -1,0 +1,8 @@
+/* Demo design tokens for testing "Underpainting: Extract Design System". */
+:root {
+  --brand: #0ea5e9;
+  --brand-dark: #4c1d95;
+  --surface: #faf5ff;
+  --ink: #1e1b4b;
+  --radius: 14px;
+}

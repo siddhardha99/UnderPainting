@@ -27,17 +27,53 @@
       {
         "command": "underpainting.clearApiKey",
         "title": "Underpainting: Clear OpenRouter API Key"
+      },
+      {
+        "command": "underpainting.selectGenerationModel",
+        "title": "Underpainting: Select Generation Model"
+      },
+      {
+        "command": "underpainting.selectValidationModel",
+        "title": "Underpainting: Select Validation Model"
+      },
+      {
+        "command": "underpainting.extractDesignSystem",
+        "title": "Underpainting: Extract Design System"
+      },
+      {
+        "command": "underpainting.showCostLedger",
+        "title": "Underpainting: Show Cost Ledger"
+      },
+      {
+        "command": "underpainting.exportDesign",
+        "title": "Underpainting: Export Design (HTML / Handoff)"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Underpainting",
+      "properties": {
+        "underpainting.generationModel": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "OpenRouter model ID used to generate designs (a strong model). Pick from the live catalog with **Underpainting: Select Generation Model** — pricing is shown per model. Model IDs only; never put your API key in settings."
+        },
+        "underpainting.validationModel": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "OpenRouter model ID used for validate/fix passes (a fast, cheap model; used by the correction loop arriving in v0.1). Pick with **Underpainting: Select Validation Model**."
+        }
+      }
+    }
   },
   "scripts": {
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src test",
+    "lint": "eslint src test evals",
     "test:unit": "vitest run",
     "test:integration": "tsc -p tsconfig.integration.json && vscode-test",
     "test:contract": "vitest run --config vitest.contract.config.ts",
+    "evals": "vitest run --config vitest.evals.config.ts",
     "test": "npm run test:unit && npm run test:integration",
     "package": "vsce package --allow-missing-repository --no-rewrite-relative-links",
     "vscode:prepublish": "node esbuild.mjs --production"

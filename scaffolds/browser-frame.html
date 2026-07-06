@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<!-- underpainting-scaffold: browser-frame v1 — presentation wrapper for exports (A5). -->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root { --frame-chrome: #e8e8ec; --frame-border: #d0d0d6; --frame-text: #5f6368; --frame-bg: #f6f6f8; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--frame-bg); padding: 32px; font-family: system-ui, sans-serif; }
+.frame-window { max-width: 1280px; margin: 0 auto; border: 1px solid var(--frame-border); border-radius: 10px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,.08); }
+.frame-bar { display: flex; align-items: center; gap: 8px; background: var(--frame-chrome); border-bottom: 1px solid var(--frame-border); padding: 10px 12px; }
+.frame-dot { width: 11px; height: 11px; border-radius: 50%; background: var(--frame-border); }
+.frame-url { flex: 1; background: #ffffff; border: 1px solid var(--frame-border); border-radius: 6px; padding: 4px 10px; font-size: 12px; color: var(--frame-text); }
+.frame-content { background: #ffffff; }
+.frame-content iframe { display: block; width: 100%; height: 80vh; border: none; }
+</style>
+</head>
+<body>
+<div class="frame-window">
+  <div class="frame-bar">
+    <span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-dot"></span>
+    <span class="frame-url">{{URL}}</span>
+  </div>
+  <div class="frame-content">
+{{BODY}}
+  </div>
+</div>
+</body>
+</html>

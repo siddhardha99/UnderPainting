@@ -4,3 +4,4 @@ out-test/
 *.vsix
 .vscode-test/
 .DS_Store
+sandbox/.design/

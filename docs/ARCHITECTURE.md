@@ -7,8 +7,21 @@ Extension Host (Node)
 ├─ KeyVault             src/host/keyvault/    SecretStorage only (P2)
 ├─ OpenRouterClient     src/host/client/      THE ONLY MODULE THAT FETCHES (P1)
 │     hostname allowlist · SSE streaming · AbortController (≤1s cancel)
-│     usage/cost readers (stream usage + /generation fallback)
-├─ Orchestrator         src/host/orchestrator/ M0: prompt → stream → cost
+│     usage/cost readers (stream usage + /generation fallback) · /models catalog
+├─ Model catalog        src/host/models/      pure helpers: pricing display,
+│     deprecation → suggested-equivalent ranking (never a silent switch)
+├─ Orchestrator         src/host/orchestrator/ prompt → stream → validate →
+│     correct (≤ CORRECTION_RETRY_CAP on the cheap validation model) → cost → commit
+├─ Validator            src/host/validator/   §7 as deterministic checks (no DOM,
+│     no deps): structure, A1 token-referencing + style-block contents, A2 leaf
+│     rule, A3 self-containment, A4 explicit dimensions, script ban; A7
+│     refinement-survival warning; surviving issues surfaced, never silent
+├─ DocumentStore        src/host/store/       immutable version snapshots + manifest;
+│     commits only complete states — cancelled/failed streams never touch disk
+├─ DesignSystemExtractor src/host/extractor/  READ-ONLY heuristic scan: :root/html
+│     custom props, static Tailwind-classic theme lift (never executes workspace
+│     code), component inventory; async, cancellable, capped; drift via source hashes
+├─ SystemStore          src/host/store/       persists tokens.css/components.md/manifest
 ├─ writeScope guard     src/host/store/       all fs writes confined to .design/ (P5/P9)
 ├─ SecretRedactor       src/host/logging/     every outbound string is scrubbed
 └─ CanvasPanel          src/host/canvas/      webview lifecycle, validated poster
@@ -18,10 +31,16 @@ Extension Host (Node)
 Canvas Webview (sandboxed)                    src/webview/canvas/
 ├─ strict CSP: default-src 'none', nonce-only scripts, no connect-src
 ├─ localResourceRoots: extension dist/webview + workspace .design/ only
-└─ nested artifact <iframe sandbox="allow-scripts">  src/webview/artifact/
-      opaque origin (no allow-same-origin) — cannot touch canvas chrome or VS Code API
-      srcdoc bootstrap receives {patch, html} messages and morphs the DOM per chunk
-      defense-in-depth sanitizer strips scripts / on* attrs / javascript: URLs
+└─ frame board (ADR-009)                       src/webview/canvas/frameState.ts
+      every version is a titled frame (model — cost) in a wrapping flow layout;
+      zoom/fit controls; click to select; one-click restore; all local + free (P4)
+      each frame = nested <iframe sandbox="allow-scripts">   src/webview/artifact/
+        opaque origin (no allow-same-origin) — cannot touch canvas chrome or VS Code API
+        cloned from the single <template> pinned in static HTML (CSP test asserts it)
+        srcdoc bootstrap receives {patch, html} messages and morphs the DOM per chunk
+        defense-in-depth sanitizer strips scripts / on* attrs / javascript: URLs
+      live-iframe budget: only the selected + on-screen frames keep live iframes;
+      off-screen frames drop to placeholders and re-render from .design/ on return
 ```
 
 ## Trust boundaries
@@ -34,7 +53,33 @@ Canvas Webview (sandboxed)                    src/webview/canvas/
 
 `Generate` click → `generate` message → Orchestrator streams from OpenRouter → each accumulated buffer passes `extractHtml` (fence/prose stripping) → `streamChunk` posts (throttled ~30ms) → canvas forwards to the artifact iframe → bootstrap parses with `DOMParser` and **morphs** the live DOM (index-based diff, `src/webview/artifact/morph.ts`) — no full reload, stable node identity, so completed content doesn't flicker while later content streams.
 
-Cost is read from OpenRouter's `usage` accounting on the final SSE frame (requested via `usage: {include: true}`); if absent, one follow-up `GET /api/v1/generation` reads the recorded cost. It is never estimated.
+Cost is read from OpenRouter's `usage` accounting on the final SSE frame (requested via `usage: {include: true}`); if absent, one follow-up `GET /api/v1/generation` reads the recorded cost (bounded: capped attempts, per-attempt timeout). It is never estimated.
+
+## Validator + correction loop (M1 item 6)
+
+Every completed generation is validated (`src/host/validator/Validator.ts` — pure string/tokenizer checks; the host has no DOM and the dependency budget stays at 1). Violations trigger correction passes on the **validation model** with minimal context (`prompts/correct.md` is the entire system prompt — a verifier in miniature, §8), hard-capped at `CORRECTION_RETRY_CAP`; costs from every pass are **summed** into the exact figure shown. No validation model configured → no correction spend, issues surfaced directly. Whatever survives the cap commits anyway (the user paid for it) with `validated: false` — a ⚠ badge on the frame and the issue list in chat. A7: targeted refinements get a line-survival check; a rewrite above threshold is a surfaced *warning*, never a correction trigger (same instruction → same result → wasted money). Direct edits re-validate locally (free).
+
+**ADR-002 scripts-enabled commit path** is implemented and deliberately dormant: a *validated* committed artifact containing `<script>` renders as its own document (inline scripts nonce-injected — `src/webview/canvas/commitRender.ts`) inside the unchanged sandbox + CSP. In v0.1 the validator rejects all scripts, so nothing reaches it; the hostile fixture can never validate (tested), and streaming always uses the stripping morph renderer.
+
+## Design-system grounding (M1 item 5)
+
+“Extract Design System” (explicit, local, free, cancellable) scans the workspace heuristically — `:root`/`html` custom properties, a **static** lift of classic `tailwind.config.*` theme values (workspace code is never executed), and a component inventory with props and cross-file usage counts — and persists to `.design/system/` via the SystemStore. When `tokens.css` exists, generation and refinement prepend `prompts/grounding.md` + the token block (as fenced data) to the system prompt, so artifacts consume the repo's real tokens instead of inventing a palette. Drift: the manifest records source hashes; the canvas re-checks on open and per generation and shows a non-blocking “may be stale” hint — re-extraction is never silent (§6). Model-written component notes are deferred: they'd be an API call and need explicit user action (P3).
+
+## Clarify-before-spend (v0.2 item 1)
+
+New-design generations (never refinements) get one optional clarifying round **before** the paid call. The form is deterministic and local (`src/shared/clarify.ts`) — no model asks the questions, so asking is free by construction (P3/P4). Licensing mirrors A6: fields the prompt already answers are not asked ("deep blue" suppresses colors; an extracted/generated design system suppresses colors entirely; "3 variations" suppresses count). Always skippable in one click ("Just generate · paid"); one round maximum; if only the never-inferable constraints field remains, the form doesn't appear at all. Answers fold into the request as an authoritative addendum; the version manifest records the **original** prompt plus the structured answers separately, for reproducibility. Gated by the `clarify-form` golden case (analyzer expectations run per-PR).
+
+## Chat + refinement (M1 item 3)
+
+The chat sidebar drives both entry points: **New design** (core prompt) and **Refine selected** (core prompt + `prompts/refine.md`, loaded per-invocation per §8). Refinement sends the selected frame's snapshot as fenced data with one instruction; the recipe requires untouched content to survive character-for-character (A7 — deterministic enforcement arrives with the Validator, item 6). The result commits as a **new** version/frame; history is never rewritten. Chat history is *derived* from the version list (one exchange per frame: prompt → model/cost), so it survives webview reloads for free; only the in-flight exchange is local state. Per-request cost shows inline in each result bubble.
+
+## Direct text editing (M1 item 4)
+
+The **Edit text** toggle (labeled local/free, P4) makes the selected frame's text leaves contenteditable — A2's one-run-per-leaf structure is what makes each edit map to exactly one source location. The bootstrap posts `{textEdit, path, before, text}` up; the canvas accepts artifact-iframe messages **only** during an edit session, only from the session frame, schema-validated (P6). Each edit is spliced into the snapshot source deterministically (`spliceText.ts`) — `before` must match the resolved leaf or the edit fails closed. The whole session saves as **one new version** (model `local edit`, cost `free`); the original snapshot is untouched, and no API call can occur anywhere on this path.
+
+## Model selection (M1 item 1)
+
+There are **no hardcoded model IDs**. The generation and validation models are user settings (`underpainting.generationModel` / `underpainting.validationModel`), chosen from the **live catalog** (`GET /api/v1/models`) via the Select-Model commands, with per-million-token pricing displayed in the picker. The catalog is fetched only on those explicit user actions (P3). When OpenRouter rejects the configured model mid-generation (deprecated/renamed), the host fetches the catalog and offers ranked equivalents (`src/host/models/catalog.ts`) — a one-click switch the user confirms, never a silent substitution (§9). The validation model is consumed by the correction loop when the Validator lands (M1 item 6).
 
 ## Activation budget
 
@@ -52,4 +97,4 @@ The **design budget for activation is ≤500ms** with no work before the first c
 | P7 one-minute audit | PRIVACY-drift check inside `allowlist.test.ts` |
 | §4 dependency budget | `test/invariants/dep-budget.test.ts` |
 
-Not yet built (M1+): DocumentStore, DesignSystemExtractor, Validator, CostLedger, chat panel, model catalog. See BUILD_BRIEF.md §11.
+M1 backlog status: items 1–10 implemented (model catalog, DocumentStore/frames, chat+refinement, direct editing, extractor+grounding, validator+corrections, scaffolds, cost ledger + status-bar credits, export/handoff, eval harness). Remaining for v0.1 release: human decisions in docs/OPEN_QUESTIONS.md and the launch-readiness items from the item-10 review.

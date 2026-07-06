@@ -14,17 +14,51 @@ describe('canvas chrome', () => {
     expect(group).not.toBeNull();
     expect(group![0]).toContain('data-width="375"');
     expect(group![0]).toContain('data-width="768"');
-    expect(group![0]).toContain('data-width=""');
+    expect(group![0]).toContain('data-width="1280"');
     // Exactly one width is active by default.
     expect(group![0].match(/aria-pressed="true"/g)!.length).toBe(1);
   });
 
+  it('offers zoom and fit controls (local/free, P4)', () => {
+    for (const id of ['zoom-in', 'zoom-out', 'zoom-fit', 'zoom-level']) {
+      expect(html).toContain(`id="${id}"`);
+    }
+  });
+
   it('labels the free/paid boundary unambiguously (P4)', () => {
-    expect(html).toContain('Generate&nbsp;·&nbsp;paid');
+    expect(html).toContain('Send&nbsp;·&nbsp;paid');
     expect(html).toContain('local and free');
   });
 
-  it('keeps a single artifact iframe inside the stage', () => {
-    expect(html.match(/<iframe/g)!.length).toBe(1);
+  it('shows the active model + pricing at the point of spend (item-1 follow-up)', () => {
+    expect(html).toContain('id="model-note"');
+  });
+
+  it('ships the direct-edit toggle labeled as local and free (M1 item 4, P4)', () => {
+    const button = html.match(/<button id="edit-text"[^>]*>/);
+    expect(button).not.toBeNull();
+    expect(button![0]).toContain('free');
+    expect(button![0]).toContain('no API call');
+  });
+
+  it('ships the clarify form, hidden by default, with per-field visibility hooks (v0.2 item 1)', () => {
+    expect(html).toContain('<div id="clarify" hidden>');
+    for (const field of ['artifactType', 'style', 'colors', 'variations', 'constraints']) {
+      expect(html).toContain(`data-field="${field}"`);
+    }
+    expect(html).toContain('id="clarify-skip"'); // always skippable, one click
+    expect(html).toContain('local &amp; free; only Generate spends'); // P4 labeling
+  });
+
+  it('ships the chat sidebar with the new/refine mode toggle (M1 item 3)', () => {
+    for (const id of ['chat', 'chat-log', 'mode-new', 'mode-refine', 'prompt', 'generate', 'cancel']) {
+      expect(html).toContain(`id="${id}"`);
+    }
+  });
+
+  it('ships the frame board and the frame clone template', () => {
+    expect(html).toContain('id="board"');
+    expect(html).toContain('<template id="frame-template"');
+    expect(html.match(/<iframe/g)!.length).toBe(1); // only the template's
   });
 });

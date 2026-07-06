@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OpenRouterClient } from '../../src/host/client/OpenRouterClient';
+import { OpenRouterClient, type ModelInfo } from '../../src/host/client/OpenRouterClient';
 
 /**
  * Live-API contract tests (brief §12 item 5): an API-drift tripwire, run
@@ -21,8 +21,50 @@ liveSuite('OpenRouter API contract (live, nightly)', () => {
     expect(Number.isFinite(credits.remaining)).toBe(true);
   });
 
-  // Catalog-shape and SSE-framing/usage-field contracts are added alongside
-  // the model catalog (M1 item 1), which provides getModels() so the tiny
-  // test completion can pick the cheapest live model instead of hardcoding
-  // a model ID.
+  it('catalog shape: /models parses and carries usable pricing', async () => {
+    const models = await client.getModels(CONTRACT_KEY!);
+    expect(models.length).toBeGreaterThan(10);
+    for (const m of models) {
+      expect(m.id.length).toBeGreaterThan(0);
+    }
+    // Pricing must be present and numeric for a meaningful share of the
+    // catalog, or the picker's price display has silently gone blind.
+    const priced = models.filter((m) => m.promptPricePerToken !== null);
+    expect(priced.length).toBeGreaterThan(models.length / 2);
+  });
+
+  it('SSE framing + usage accounting on a tiny live completion', async () => {
+    const models = await client.getModels(CONTRACT_KEY!);
+    const model = pickCheapestChatModel(models);
+    const result = await client.streamChat({
+      apiKey: CONTRACT_KEY!,
+      model,
+      system: 'Reply with the single word: ok',
+      user: 'ok?',
+      maxTokens: 16,
+      signal: AbortSignal.timeout(60_000),
+    });
+    // Framing: deltas parsed into text.
+    expect(result.text.length).toBeGreaterThan(0);
+    // Usage accounting fields (usage: {include: true}) — the cost display
+    // and ledger depend on exactly these.
+    expect(result.promptTokens).not.toBeNull();
+    expect(result.completionTokens).not.toBeNull();
+    expect(result.costUsd).not.toBeNull();
+    expect(result.generationId).not.toBeNull();
+  }, 90_000);
 });
+
+/** Cheapest completion-priced model; prefers explicitly free variants. */
+function pickCheapestChatModel(models: ModelInfo[]): string {
+  const free = models.find((m) => m.id.endsWith(':free'));
+  if (free) return free.id;
+  const priced = models
+    .filter((m) => m.promptPricePerToken !== null && m.completionPricePerToken !== null)
+    .sort(
+      (a, b) =>
+        a.promptPricePerToken! + a.completionPricePerToken! - (b.promptPricePerToken! + b.completionPricePerToken!),
+    );
+  if (priced.length === 0) throw new Error('catalog carried no priced models');
+  return priced[0]!.id;
+}

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inkwell Pricing</title>
+<style>
+  :root {
+    --bg: #f7f6f2;
+    --surface: #ffffff;
+    --surface-alt: #fbfaf6;
+    --text: #1e1c1a;
+    --muted: #6b665f;
+    --accent: #4a3aff;
+    --accent-soft: #ece9ff;
+    --border: #e4e1d9;
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --space-7: 48px;
+    --space-8: 64px;
+
+    --fs-sm: 0.85rem;
+    --fs-base: 1rem;
+    --fs-lg: 1.25rem;
+    --fs-xl: 1.75rem;
+    --fs-2xl: 2.5rem;
+
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+
+    --shadow: 0 1px 2px rgba(30,28,26,0.06), 0 8px 24px rgba(30,28,26,0.06);
+    --shadow-hi: 0 2px 6px rgba(74,58,255,0.12), 0 16px 40px rgba(74,58,255,0.18);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  img, svg { display: block; }
+</style>
+</head>
+<body style="background: var(--bg); color: var(--text); font-family: 'Iowan Old Style', Georgia, 'Times New Roman', serif; line-height: 1.5; -webkit-font-smoothing: antialiased;">
+  <main style="max-width: 1080px; margin: 0 auto; padding: var(--space-8) var(--space-5);">
+
+    <header style="text-align: center; max-width: 620px; margin: 0 auto var(--space-8);">
+      <div style="display: inline-flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-5);">
+        <svg width="28" height="28" viewBox="0 0 28 28" role="img" aria-label="Inkwell logo" style="flex: none;">
+          <rect x="4" y="10" width="20" height="14" rx="3" fill="var(--accent)"></rect>
+          <path d="M14 3 L18 10 H10 Z" fill="var(--text)"></path>
+        </svg>
+        <span style="font-size: var(--fs-lg); font-weight: 600; letter-spacing: 0.01em;">Inkwell</span>
+      </div>
+      <h1 style="font-size: var(--fs-2xl); line-height: 1.15; margin-bottom: var(--space-4);">Pricing that scales with your ideas</h1>
+      <p style="font-size: var(--fs-lg); color: var(--muted); font-family: system-ui, -apple-system, sans-serif;">Start free, upgrade when your notes need room to grow. No hidden fees, cancel anytime.</p>
+    </header>
+
+    <section aria-label="Pricing plans" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-5); align-items: start;">
+
+      <!-- Free plan -->
+      <article style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: var(--space-5);">
+        <div>
+          <h2 style="font-size: var(--fs-lg); margin-bottom: var(--space-2);">Free</h2>
+          <p style="color: var(--muted); font-family: system-ui, -apple-system, sans-serif; font-size: var(--fs-sm);">For personal notes and quick captures.</p>
+        </div>
+        <p style="display: flex; align-items: baseline; gap: var(--space-1);">
+          <span style="font-size: var(--fs-2xl); font-weight: 700;">$0</span>
+          <span style="color: var(--muted); font-size: var(--fs-base); font-family: system-ui, -apple-system, sans-serif;">/mo</span>
+        </p>
+        <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-3); font-family: system-ui, -apple-system, sans-serif; font-size: var(--fs-base);">
+          <li style="display: flex; gap: var(--space-2); align-items: flex-start;">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M3 9.5 L7 13 L15 5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span>Up to 100 notes</span>
+          </li>
+          <li style="display: flex; gap: var(--space-2); align-items: flex-start;">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M3 9.5 L7 13 L15 5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span>Markdown editor</span>
+          </li>
+          <li style="display: flex; gap: var(--space-2); align-items: flex-start;">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M3 9.5 L7 13 L15 5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span>Sync on one device</span>
+          </li>
+        </ul>
+        <a href="#" style="margin-top: auto; text-align: center; text-decoration: none; font-family: system-ui, -apple-system, sans-serif; font-weight: 600; font-size: var(--fs-base); padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--text); background: var(--surface-alt);">Get started</a>
+      </article>
+
+      <!-- Pro plan (highlighted) -->
+      <article style="background: var(--surface); border: 2px solid var(--accent); border-radius: var(--radius-lg); padding: var(--space-6); box-shadow: var(--shadow-hi); display: flex; flex-direction: column; gap: var(--space-5); position: relative;">
+        <span style="position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); background: var(--accent); color: var(--surface); font-family: system-ui, -apple-system, sans-serif; font-size: var(--fs-sm); font-weight: 600; padding: var(--space-1) var(--space-3); border-radius: 999px; letter-spacing: 0.03em;">Recommended</span>
+        <div>
+          <h2 style="font-size: var(--fs-lg); margin-bottom: var(--space-2); color: var(--accent);">Pro</h2>
+          <p style="color: var(--muted); font-family: system-ui, -apple-system, sans-serif; font-size: var(--fs-sm);">For serious writers and thinkers.</p>
+        </div>
+        <p style="display: flex; align-items: baseline; gap: var(--space-1);">
+          <span style="font-size: var(--fs-2xl); font-weight: 700;">$8</span>
+          <span style="color: var(--muted); font-size: var(--fs-base); font-family: system-ui, -apple-system, sans-serif;">/mo</span>
+        </p>
+        <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-3); font-family: system-ui, -apple-system, sans-serif; font-size: var(--fs-base);">
+          <li style="display: flex; gap: var(--space-2); align-items: flex-start;">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M3 9.5 L7 13 L15 5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span>Unlimited notes</span>
+          </li>
+          <li style="display: flex; gap: var(--space-2); align-items: flex-start;">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M3 9.5 L7 13 L15 5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span>Sync across all devices</span>
+          </li>
+          <li style="display: flex; gap: var(--space-2); align-items: flex-start;">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M3 9.5 L7 13 L15 5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span>Version history & backlinks</span>
+          </li>
+          <li style="display: flex; gap: var(--space-2); align-items: flex-start;">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M3 9.5 L7 13 L15 5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span>Offline access</span>
+          </li>
+        </ul>
+        <a href="#" style="margin-top: auto; text-align: center; text-decoration: none; font-family: system-ui, -apple-system, sans-serif; font-weight: 600; font-size: var(--fs-base); padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--accent); color: var(--surface); background: var(--accent);">Choose Pro</a>
+      </article>
+
+      <!-- Team plan -->
+      <article style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: var(--space-5);">
+        <div>
+          <h2 style="font-size: var(--fs-lg); margin-bottom: var(--space-2);">Team</h2>
+          <p style="color: var(--muted); font-family: system-ui, -apple-system, sans-serif; font-size: var(--fs-sm);">For groups sharing a knowledge base.</p>
+        </div>
+        <p style="display: flex; align-items: baseline; gap: var(--space-1);">
+          <span style="font-size: var(--fs-2xl); font-weight: 700;">$20</span>
+          <span style="color: var(--muted); font-size: var(--fs-base); font-family: system-ui, -apple-system, sans-serif;">/mo</span>
+        </p>
+        <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-3); font-family: system-ui, -apple-system, sans-serif; font-size: var(--fs-base);">
+          <li style="display: flex; gap: var(--space-2); align-items: flex-start;">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M3 9.5 L7 13 L15 5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span>Everything in Pro</span>
+          </li>
+          <li style="display: flex; gap: var(--space-2); align-items: flex-start;">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M3 9.5 L7 13 L15 5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span>Shared workspaces</span>
+          </li>
+          <li style="display: flex; gap: var(--space-2); align-items: flex-start;">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M3 9.5 L7 13 L15 5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span>Real-time collaboration</span>
+          </li>
+          <li style="display: flex; gap: var(--space-2); align-items: flex-start;">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M3 9.5 L7 13 L15 5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span>Admin roles & permissions</span>
+          </li>
+        </ul>
+        <a href="#" style="margin-top: auto; text-align: center; text-decoration: none; font-family: system-ui, -apple-system, sans-serif; font-weight: 600; font-size: var(--fs-base); padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--text); background: var(--surface-alt);">Start with Team</a>
+      </article>
+
+    </section>
+
+    <footer style="text-align: center; margin-top: var(--space-8);">
+      <p style="color: var(--muted); font-family: system-ui, -apple-system, sans-serif; font-size: var(--fs-sm);">All plans include a 14-day trial. Prices billed monthly in USD.</p>
+    </footer>
+
+  </main>
+</body>
+</html>

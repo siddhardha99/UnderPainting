@@ -63,11 +63,26 @@ describe('P6: canvas webview CSP', () => {
 });
 
 describe('P6: artifact iframe isolation', () => {
-  it('sandboxes the artifact with allow-scripts only — never allow-same-origin', () => {
-    const iframe = html().match(/<iframe[^>]*id="artifact"[^>]*>/);
-    expect(iframe).not.toBeNull();
-    expect(iframe![0]).toContain('sandbox="allow-scripts"');
-    expect(iframe![0]).not.toContain('allow-same-origin');
+  it('every iframe is sandboxed with allow-scripts only — never allow-same-origin', () => {
+    const iframes = html().match(/<iframe[^>]*>/g);
+    // Frames mount dynamically, but only by cloning the template iframe —
+    // so pinning every static iframe tag pins them all.
+    expect(iframes).not.toBeNull();
+    for (const tag of iframes!) {
+      expect(tag).toContain('sandbox="allow-scripts"');
+      expect(tag).not.toContain('allow-same-origin');
+      expect(tag).toContain('srcdoc=');
+    }
+  });
+
+  it('frame iframes exist only inside the clone template', () => {
+    const page = html();
+    const templateBody = page.match(/<template id="frame-template"[^>]*>([\s\S]*?)<\/template>/);
+    expect(templateBody).not.toBeNull();
+    const iframesInTemplate = templateBody![1]!.match(/<iframe/g)?.length ?? 0;
+    const iframesTotal = page.match(/<iframe/g)?.length ?? 0;
+    expect(iframesInTemplate).toBe(1);
+    expect(iframesTotal).toBe(iframesInTemplate);
   });
 
   it('gives the bootstrap script the nonce and closes it safely', () => {
