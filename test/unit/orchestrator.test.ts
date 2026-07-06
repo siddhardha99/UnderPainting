@@ -11,6 +11,7 @@ function makeDeps(options: {
   withKey: boolean;
   fetchFn: typeof fetch;
   model?: string | undefined | 'unset';
+  withCommit?: boolean;
 }) {
   const backing = new Map<string, string>();
   const secrets: SecretStorageLike = {
@@ -22,6 +23,7 @@ function makeDeps(options: {
   const posted: HostToWebview[] = [];
   const logs: string[] = [];
   const unavailableModels: string[] = [];
+  const commits: Array<{ html: string; prompt: string; model: string }> = [];
   const logger: Logger = { info: (m) => logs.push(m), error: (m) => logs.push(`ERROR ${m}`) };
   const orchestrator = new Orchestrator({
     client: new OpenRouterClient({ fetchFn: options.fetchFn }),
@@ -31,9 +33,12 @@ function makeDeps(options: {
     getGenerationModel: () => (options.model === 'unset' ? undefined : (options.model ?? 'test/model')),
     onModelUnavailable: (id) => unavailableModels.push(id),
     post: (m) => posted.push(m),
+    commit: options.withCommit
+      ? async (r) => void commits.push({ html: r.html, prompt: r.prompt, model: r.model })
+      : undefined,
   });
   const ready = options.withKey ? keyVault.setKey(KEY) : Promise.resolve();
-  return { orchestrator, posted, logs, ready, unavailableModels };
+  return { orchestrator, posted, logs, ready, unavailableModels, commits };
 }
 
 function sse(frames: string[]): Response {
@@ -141,6 +146,55 @@ describe('Orchestrator (P3: user money, explicit actions only)', () => {
     await run;
     expect(posted.some((m) => m.type === 'streamCancelled')).toBe(true);
     expect(posted.some((m) => m.type === 'streamError')).toBe(false);
+  });
+
+  it('commits only complete generations (P5): success commits, cancel never does', async () => {
+    const frames = [
+      'data: {"id":"g","choices":[{"delta":{"content":"<!doctype html><p>done</p>"}}]}\n\n',
+      'data: {"id":"g","choices":[{"delta":{}}],"usage":{"prompt_tokens":1,"completion_tokens":2,"cost":0.001}}\n\n',
+      'data: [DONE]\n\n',
+    ];
+    const success = makeDeps({ withKey: true, withCommit: true, fetchFn: async () => sse(frames) });
+    await success.ready;
+    await success.orchestrator.generate('a card');
+    expect(success.commits).toHaveLength(1);
+    expect(success.commits[0]!.html).toBe('<!doctype html><p>done</p>');
+    expect(success.commits[0]!.prompt).toBe('a card');
+    // The commit precedes streamDone so the webview can adopt its frame.
+    const doneIndex = success.posted.findIndex((m) => m.type === 'streamDone');
+    expect(doneIndex).toBeGreaterThan(-1);
+
+    const cancelled = makeDeps({
+      withKey: true,
+      withCommit: true,
+      fetchFn: async (_url, init) => {
+        const signal = init!.signal!;
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(c) {
+              signal.addEventListener('abort', () => c.error(new DOMException('aborted', 'AbortError')));
+              c.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"<p>"}}]}\n\n'));
+            },
+          }),
+          { status: 200 },
+        );
+      },
+    });
+    await cancelled.ready;
+    const run = cancelled.orchestrator.generate('slow');
+    await new Promise((r) => setTimeout(r, 20));
+    cancelled.orchestrator.cancel();
+    await run;
+    expect(cancelled.commits).toHaveLength(0);
+
+    const failed = makeDeps({
+      withKey: true,
+      withCommit: true,
+      fetchFn: async () => new Response('boom', { status: 500 }),
+    });
+    await failed.ready;
+    await failed.orchestrator.generate('will fail');
+    expect(failed.commits).toHaveLength(0);
   });
 
   it('makes zero API calls when no generation model is configured (no hardcoded fallback)', async () => {
