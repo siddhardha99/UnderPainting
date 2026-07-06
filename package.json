@@ -27,8 +27,31 @@
       {
         "command": "underpainting.clearApiKey",
         "title": "Underpainting: Clear OpenRouter API Key"
+      },
+      {
+        "command": "underpainting.selectGenerationModel",
+        "title": "Underpainting: Select Generation Model"
+      },
+      {
+        "command": "underpainting.selectValidationModel",
+        "title": "Underpainting: Select Validation Model"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Underpainting",
+      "properties": {
+        "underpainting.generationModel": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "OpenRouter model ID used to generate designs (a strong model). Pick from the live catalog with **Underpainting: Select Generation Model** — pricing is shown per model. Model IDs only; never put your API key in settings."
+        },
+        "underpainting.validationModel": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "OpenRouter model ID used for validate/fix passes (a fast, cheap model; used by the correction loop arriving in v0.1). Pick with **Underpainting: Select Validation Model**."
+        }
+      }
+    }
   },
   "scripts": {
     "build": "node esbuild.mjs",

@@ -16,6 +16,8 @@ export interface CanvasDeps {
   logger: Logger;
   redactor: SecretRedactor;
   loadCorePrompt: () => Promise<string>;
+  getGenerationModel: () => string | undefined;
+  onModelUnavailable: (modelId: string) => void;
 }
 
 export class CanvasPanel {
@@ -78,6 +80,8 @@ export class CanvasPanel {
       keyVault: deps.keyVault,
       logger: deps.logger,
       loadCorePrompt: deps.loadCorePrompt,
+      getGenerationModel: deps.getGenerationModel,
+      onModelUnavailable: deps.onModelUnavailable,
       post,
     });
 

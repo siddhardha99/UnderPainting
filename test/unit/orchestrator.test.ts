@@ -7,7 +7,11 @@ import type { HostToWebview } from '../../src/shared/messages';
 
 const KEY = 'sk-or-v1-orchestrator-test-key';
 
-function makeDeps(options: { withKey: boolean; fetchFn: typeof fetch }) {
+function makeDeps(options: {
+  withKey: boolean;
+  fetchFn: typeof fetch;
+  model?: string | undefined | 'unset';
+}) {
   const backing = new Map<string, string>();
   const secrets: SecretStorageLike = {
     get: async (k) => backing.get(k),
@@ -17,16 +21,19 @@ function makeDeps(options: { withKey: boolean; fetchFn: typeof fetch }) {
   const keyVault = new KeyVault(secrets, new SecretRedactor());
   const posted: HostToWebview[] = [];
   const logs: string[] = [];
+  const unavailableModels: string[] = [];
   const logger: Logger = { info: (m) => logs.push(m), error: (m) => logs.push(`ERROR ${m}`) };
   const orchestrator = new Orchestrator({
     client: new OpenRouterClient({ fetchFn: options.fetchFn }),
     keyVault,
     logger,
     loadCorePrompt: async () => 'core prompt',
+    getGenerationModel: () => (options.model === 'unset' ? undefined : (options.model ?? 'test/model')),
+    onModelUnavailable: (id) => unavailableModels.push(id),
     post: (m) => posted.push(m),
   });
   const ready = options.withKey ? keyVault.setKey(KEY) : Promise.resolve();
-  return { orchestrator, posted, logs, ready };
+  return { orchestrator, posted, logs, ready, unavailableModels };
 }
 
 function sse(frames: string[]): Response {
@@ -134,6 +141,54 @@ describe('Orchestrator (P3: user money, explicit actions only)', () => {
     await run;
     expect(posted.some((m) => m.type === 'streamCancelled')).toBe(true);
     expect(posted.some((m) => m.type === 'streamError')).toBe(false);
+  });
+
+  it('makes zero API calls when no generation model is configured (no hardcoded fallback)', async () => {
+    let fetchCalls = 0;
+    const { orchestrator, posted, ready } = makeDeps({
+      withKey: true,
+      model: 'unset',
+      fetchFn: async () => {
+        fetchCalls++;
+        return sse([]);
+      },
+    });
+    await ready;
+    await orchestrator.generate('a card');
+    expect(fetchCalls).toBe(0);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]!.type).toBe('streamError');
+    expect((posted[0] as { message: string }).message).toContain('Select Generation Model');
+  });
+
+  it('routes a rejected model to the suggested-equivalent flow, never a silent substitution (§9)', async () => {
+    const { orchestrator, posted, unavailableModels, ready } = makeDeps({
+      withKey: true,
+      model: 'anthropic/claude-gone-1.0',
+      fetchFn: async () =>
+        new Response(JSON.stringify({ error: { message: 'anthropic/claude-gone-1.0 is not a valid model ID' } }), {
+          status: 400,
+        }),
+    });
+    await ready;
+    await orchestrator.generate('a card');
+    const error = posted.find((m) => m.type === 'streamError') as Extract<
+      HostToWebview,
+      { type: 'streamError' }
+    >;
+    expect(error.message).toContain('anthropic/claude-gone-1.0');
+    expect(error.message.toLowerCase()).toContain('deprecated or renamed');
+    expect(unavailableModels).toEqual(['anthropic/claude-gone-1.0']);
+  });
+
+  it('does not invoke the model-switch flow for unrelated request errors', async () => {
+    const { orchestrator, unavailableModels, ready } = makeDeps({
+      withKey: true,
+      fetchFn: async () => new Response('server exploded', { status: 500 }),
+    });
+    await ready;
+    await orchestrator.generate('a card');
+    expect(unavailableModels).toEqual([]);
   });
 
   it('keeps the correction retry cap bounded (§9)', () => {
