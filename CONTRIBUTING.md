@@ -12,7 +12,7 @@ Thanks for helping build Underpainting. Read [BUILD_BRIEF.md](BUILD_BRIEF.md) §
 
 ## Prompt provenance (ADR-008)
 
-All prompt text in this repository must be original work. Principles learned from studying production tools are fair game; reproducing or closely paraphrasing another tool's prompt text is prohibited. Do not paste, adapt, or "reference while writing" any external system-prompt text. Prompt PRs are reviewed for provenance.
+All prompt text in this repository must be original work. Principles learned from studying production tools are fair game (recorded per-principle in [docs/PRIOR-ART.md](docs/PRIOR-ART.md)); reproducing or closely paraphrasing another tool's prompt text is prohibited. Do not paste, adapt, or "reference while writing" any external system-prompt text. **Prompt PRs are reviewed for provenance; contributions derived from other tools' prompt text will be rejected**, whether the text appears in prompts, docs, ADRs, issues, comments, or commit messages.
 
 ## The eval merge bar
 

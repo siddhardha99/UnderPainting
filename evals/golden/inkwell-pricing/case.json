@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "slug": "inkwell-pricing",
+  "added": "2026-07-06",
+  "origin": "First live M0 generation, approved at M0 review.",
+  "exercises": [
+    "A2: three plan cards must be three literal blocks of markup, never script- or loop-generated",
+    "Instruction-following: exactly one card (Pro) visually distinguished as recommended",
+    "A1: highlight and all styling driven by tokens via var(--token), single permitted style block",
+    "A6 boundary: 'a short feature list' licenses invented-but-plausible feature names (do NOT flag); unrequested sections or decorative stats (testimonials, trust banners) ARE flagged"
+  ],
+  "checks": [
+    { "id": "a1-token-styling", "kind": "deterministic", "note": "inline styles consume var(--token); style block contains only :root/@font-face/@keyframes/reset" },
+    { "id": "a2-literal-repetition", "kind": "deterministic", "note": "three sibling card subtrees present in markup; no script-constructed content" },
+    { "id": "a3-self-contained", "kind": "deterministic", "note": "zero external references" },
+    { "id": "one-highlighted-card", "kind": "deterministic", "note": "exactly one card carries the accent treatment; it is the Pro card" },
+    { "id": "a6-no-unrequested-material", "kind": "deterministic-subset", "note": "no sections beyond heading + plan cards; feature-list contents are exempt per the A6 scoring rule in evals/README.md" }
+  ]
+}

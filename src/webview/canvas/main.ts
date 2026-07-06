@@ -95,6 +95,21 @@ generateButton.addEventListener('click', () => {
 
 cancelButton.addEventListener('click', () => send({ type: 'cancel' }));
 
+// Viewport preview toggle: purely local DOM state — free, never a message,
+// never an API call (P4).
+const viewportButtons = Array.from(
+  document.querySelectorAll<HTMLButtonElement>('#viewport button'),
+);
+for (const button of viewportButtons) {
+  button.addEventListener('click', () => {
+    const width = button.dataset['width'];
+    artifactFrame.style.width = width ? `${width}px` : '100%';
+    for (const other of viewportButtons) {
+      other.setAttribute('aria-pressed', String(other === button));
+    }
+  });
+}
+
 promptInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !generateButton.disabled) {
     generateButton.click();

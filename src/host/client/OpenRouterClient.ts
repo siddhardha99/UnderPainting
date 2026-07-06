@@ -24,6 +24,14 @@ export const ENDPOINTS = {
 /** Transient network errors retry with backoff at most this many times (§9). */
 export const TRANSIENT_RETRY_CAP = 2;
 
+/**
+ * Per-attempt timeout for the /generation cost lookup. The whole fallback is
+ * bounded: (TRANSIENT_RETRY_CAP + 1) attempts × this timeout, plus backoff
+ * (OPEN_QUESTIONS #9 resolution — exact cost is an NFR, but never at the
+ * price of an unbounded wait).
+ */
+export const GENERATION_LOOKUP_TIMEOUT_MS = 4_000;
+
 export class KeyRejectedError extends Error {
   constructor() {
     super('OpenRouter rejected the API key (401).');
@@ -272,6 +280,7 @@ export class OpenRouterClient {
           {
             method: 'GET',
             headers: { authorization: `Bearer ${apiKey}` },
+            signal: AbortSignal.timeout(GENERATION_LOOKUP_TIMEOUT_MS),
           },
         );
         if (res.status === 404) {
