@@ -23,6 +23,7 @@ export interface CanvasDeps {
   loadRefineRecipe: () => Promise<string>;
   loadGroundingPreamble: () => Promise<string>;
   loadCorrectionRecipe: () => Promise<string>;
+  loadPageScaffold: () => Promise<string>;
   getGenerationModel: () => string | undefined;
   getValidationModel: () => string | undefined;
   /** Pricing cached when the model was picked; undefined when hand-edited into settings. */
@@ -135,6 +136,7 @@ export class CanvasPanel {
       loadRefineRecipe: deps.loadRefineRecipe,
       loadGroundingPreamble: deps.loadGroundingPreamble,
       loadCorrectionRecipe: deps.loadCorrectionRecipe,
+      loadPageScaffold: deps.loadPageScaffold,
       loadGroundingTokens: async () => (systemStore ? systemStore.readTokensCss() : null),
       getGenerationModel: deps.getGenerationModel,
       getValidationModel: deps.getValidationModel,

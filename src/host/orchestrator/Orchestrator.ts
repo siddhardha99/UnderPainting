@@ -9,6 +9,7 @@ import {
   refinementSurvivalRatio,
   validateArtifact,
 } from '../validator/Validator';
+import { assembleArtifact } from './scaffold';
 
 /**
  * One generation at a time: prompt → stream → cost → commit. The model comes
@@ -37,6 +38,12 @@ export interface OrchestratorDeps {
   loadRefineRecipe: () => Promise<string>;
   /** The correction-pass recipe — the ENTIRE system prompt for corrections (§8: verifier in miniature). */
   loadCorrectionRecipe: () => Promise<string>;
+  /**
+   * The page scaffold (A5, M1 item 7): fresh generations stream only
+   * tokens + body; the shell is copied around them, never regenerated.
+   * Undefined falls back to full-document output (pre-scaffold behavior).
+   */
+  loadPageScaffold?: () => Promise<string>;
   /** The cheap/fast validation model for correction passes; undefined skips corrections. */
   getValidationModel: () => string | undefined;
   /** The grounding preamble prepended to the workspace token block (§8, M1 item 5). */
@@ -77,6 +84,8 @@ interface RunRequest {
   user: string;
   /** Refinement base for the A7 diff-minimality warning. */
   refineBase?: string;
+  /** Wraps the streamed fragment into the scaffold shell (A5); identity for refinements. */
+  assemble?: (fragment: string) => string;
 }
 
 export class Orchestrator {
@@ -90,11 +99,15 @@ export class Orchestrator {
 
   /** Fresh design from a prompt, grounded in the workspace's extracted tokens when they exist. */
   async generate(userPrompt: string): Promise<void> {
-    await this.run(async () => ({
-      prompt: userPrompt,
-      system: (await this.deps.loadCorePrompt()) + (await this.groundingSection()),
-      user: userPrompt,
-    }));
+    await this.run(async () => {
+      const scaffold = await this.deps.loadPageScaffold?.();
+      return {
+        prompt: userPrompt,
+        system: (await this.deps.loadCorePrompt()) + (await this.groundingSection()),
+        user: userPrompt,
+        assemble: scaffold ? (fragment: string) => assembleArtifact(scaffold, fragment) : undefined,
+      };
+    });
   }
 
   /**
@@ -165,6 +178,10 @@ export class Orchestrator {
     post({ type: 'streamStart' });
 
     let lastPostAt = 0;
+    const toArtifact = (raw: string): string => {
+      const fragment = extractHtml(raw);
+      return request.assemble ? request.assemble(fragment) : fragment;
+    };
     try {
       const result = await client.streamChat({
         apiKey,
@@ -176,7 +193,7 @@ export class Orchestrator {
           const now = Date.now();
           if (now - lastPostAt >= CHUNK_POST_INTERVAL_MS) {
             lastPostAt = now;
-            post({ type: 'streamChunk', html: extractHtml(accumulated) });
+            post({ type: 'streamChunk', html: toArtifact(accumulated) });
           }
         },
       });
@@ -194,7 +211,7 @@ export class Orchestrator {
         }
       }
 
-      let finalHtml = extractHtml(result.text);
+      let finalHtml = toArtifact(result.text);
 
       // ---- Validator + bounded correction loop (M1 item 6, §7/§9). Each
       // correction pass is one call on the cheap validation model with

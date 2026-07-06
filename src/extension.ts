@@ -31,6 +31,7 @@ interface Services {
   loadRefineRecipe: () => Promise<string>;
   loadGroundingPreamble: () => Promise<string>;
   loadCorrectionRecipe: () => Promise<string>;
+  loadPageScaffold: () => Promise<string>;
   /** Catalog pricing captured when the user picked the model — display only, never refetched (P3). */
   getModelPricing: (modelId: string) => string | undefined;
   cacheModelPricing: (modelId: string, detail: string) => Promise<void>;
@@ -57,6 +58,8 @@ export function activate(context: vscode.ExtensionContext): void {
           fs.readFile(path.join(context.extensionUri.fsPath, 'prompts', 'grounding.md'), 'utf8'),
         loadCorrectionRecipe: () =>
           fs.readFile(path.join(context.extensionUri.fsPath, 'prompts', 'correct.md'), 'utf8'),
+        loadPageScaffold: () =>
+          fs.readFile(path.join(context.extensionUri.fsPath, 'scaffolds', 'page.html'), 'utf8'),
         getModelPricing: (modelId) =>
           context.globalState.get<string>(`underpainting.pricing.${modelId}`),
         cacheModelPricing: (modelId, detail) =>
