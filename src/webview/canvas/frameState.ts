@@ -62,6 +62,14 @@ export function applyFrames(
       adoptPendingAs: justCommitted,
     };
   }
+  if (justCommitted) {
+    // A commit without a streaming placeholder (e.g. a direct-edit save):
+    // select the new version; its card renders and fetches its snapshot.
+    return {
+      state: { frames, currentId, selectedId: justCommitted, pendingId: state.pendingId },
+      adoptPendingAs: null,
+    };
+  }
   let selectedId = state.selectedId;
   const stillExists =
     selectedId !== null && (frames.some((f) => f.id === selectedId) || selectedId === state.pendingId);

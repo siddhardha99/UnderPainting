@@ -1,9 +1,11 @@
 import {
+  artifactToCanvasSchema,
   hostToWebviewSchema,
   webviewToHostSchema,
   type FrameMeta,
   type WebviewToHost,
 } from '../../shared/messages';
+import { spliceTextEdit } from './spliceText';
 import {
   applyFrames,
   endPending,
@@ -75,6 +77,9 @@ const cards = new Map<string, FrameCard>();
 let zoom = 0.4;
 let mode: 'new' | 'refine' = 'new';
 let ephemeral: EphemeralExchange | null = null;
+/** Active direct-edit session (M1 item 4) — entirely local until Done saves one snapshot. */
+let editSession: { frameId: string; dirty: boolean; editCount: number } | null = null;
+const editButton = document.getElementById('edit-text') as HTMLButtonElement;
 
 function send(message: WebviewToHost): void {
   vscode.postMessage(webviewToHostSchema.parse(message));
@@ -131,9 +136,7 @@ function renderChat(): void {
     meta.textContent = frame.subtitle + (frame.isCurrent ? ' · current' : '');
     result.append(cost, meta);
     result.addEventListener('click', () => {
-      state = select(state, frame.id);
-      send({ type: 'selectFrame', id: frame.id });
-      render();
+      selectFrameById(frame.id);
       cards.get(frame.id)?.root.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     });
     chatLog.appendChild(result);
@@ -190,11 +193,7 @@ function createCard(id: string): FrameCard {
     onScreen: false,
   };
   wireIframe(card);
-  card.root.addEventListener('click', () => {
-    state = select(state, card.id);
-    send({ type: 'selectFrame', id: card.id });
-    render();
-  });
+  card.root.addEventListener('click', () => selectFrameById(card.id));
   card.restoreButton.addEventListener('click', (event) => {
     event.stopPropagation();
     send({ type: 'restore', id: card.id }); // local file op on the host — free (P4)
@@ -217,7 +216,10 @@ function wireIframe(card: FrameCard): void {
   });
 }
 
-function postToFrame(card: FrameCard, message: { type: 'patch'; html: string } | { type: 'reset' }): void {
+function postToFrame(
+  card: FrameCard,
+  message: { type: 'patch'; html: string } | { type: 'reset' } | { type: 'editMode'; enabled: boolean },
+): void {
   // Frame iframes have opaque origins (sandbox without allow-same-origin),
   // so the target origin is necessarily '*'; the payload is only artifact HTML.
   card.iframe?.contentWindow?.postMessage(message, '*');
@@ -305,6 +307,73 @@ function adoptPending(newId: string, meta: FrameMeta | undefined): void {
   }
 }
 
+function selectFrameById(id: string): void {
+  // Switching frames closes an open edit session (saving any pending edits).
+  if (editSession && editSession.frameId !== id) {
+    finishEditSession();
+  }
+  state = select(state, id);
+  send({ type: 'selectFrame', id });
+  render();
+}
+
+// ------------------------------------------------------- direct text editing
+
+editButton.addEventListener('click', () => {
+  if (editSession) {
+    finishEditSession();
+    return;
+  }
+  const target = state.selectedId;
+  const card = target ? cards.get(target) : undefined;
+  if (!target || target === PENDING_ID || !state.frames.some((f) => f.id === target) || !card?.iframe) {
+    setStatus('Select a saved frame first, then edit its text.', true);
+    return;
+  }
+  editSession = { frameId: target, dirty: false, editCount: 0 };
+  editButton.setAttribute('aria-pressed', 'true');
+  editButton.textContent = 'Done editing';
+  postToFrame(card, { type: 'editMode', enabled: true });
+  setStatus('Editing text — local & free, no API calls. Click “Done editing” to save as a new version.');
+});
+
+function finishEditSession(): void {
+  if (!editSession) return;
+  const session = editSession;
+  editSession = null;
+  editButton.setAttribute('aria-pressed', 'false');
+  editButton.textContent = 'Edit text';
+  const card = cards.get(session.frameId);
+  if (card?.iframe) {
+    postToFrame(card, { type: 'editMode', enabled: false });
+  }
+  if (session.dirty && card?.html) {
+    // One snapshot for the whole session (P5); the original version is untouched.
+    send({ type: 'commitEdit', frameId: session.frameId, html: card.html, editCount: session.editCount });
+    // The old card must show its unedited snapshot again.
+    card.html = null;
+    if (card.iframe) send({ type: 'requestFrame', id: card.id });
+    setStatus('Saved your edits as a new version — free.');
+  } else {
+    setStatus('Edit mode off — nothing changed.');
+  }
+}
+
+function handleTextEdit(card: FrameCard, edit: { path: number[]; before: string; text: string }): void {
+  if (!editSession || card.html === null) return;
+  const next = spliceTextEdit(card.html, edit.path, edit.before, edit.text, new DOMParser());
+  if (next === null) {
+    setStatus('Couldn’t map that edit back to the source — it was not recorded.', true);
+    return;
+  }
+  card.html = next;
+  editSession.dirty = true;
+  editSession.editCount += 1;
+  setStatus(
+    `${editSession.editCount} edit${editSession.editCount === 1 ? '' : 's'} pending — local & free. Click “Done editing” to save.`,
+  );
+}
+
 // ------------------------------------------------------------------ zoom/fit
 
 function setZoom(next: number): void {
@@ -349,8 +418,19 @@ function syncViewportButtons(): void {
 // ------------------------------------------------------------------- bus in
 
 window.addEventListener('message', (event: MessageEvent) => {
-  // Only the extension host talks to this window; frame iframes never post
-  // back, and anything unparseable is dropped (P6).
+  // Frame iframes may post only while an edit session is open, only from the
+  // session frame's contentWindow, and only messages matching the artifact
+  // schema — everything else from an iframe is dropped (P6).
+  if (event.source && editSession) {
+    const sessionCard = cards.get(editSession.frameId);
+    if (sessionCard?.iframe && event.source === sessionCard.iframe.contentWindow) {
+      const editParsed = artifactToCanvasSchema.safeParse(event.data);
+      if (editParsed.success) {
+        handleTextEdit(sessionCard, editParsed.data);
+      }
+      return;
+    }
+  }
   const parsed = hostToWebviewSchema.safeParse(event.data);
   if (!parsed.success) return;
   const message = parsed.data;
@@ -458,6 +538,11 @@ generateButton.addEventListener('click', () => {
   if (!prompt) {
     setStatus('Type a prompt first.');
     return;
+  }
+  // Sending while editing saves the edit session first, so the refinement
+  // base and the board agree on what the user is looking at.
+  if (editSession) {
+    finishEditSession();
   }
   // This click is the explicit user action behind the API call (P3).
   if (mode === 'refine') {

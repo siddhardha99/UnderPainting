@@ -149,6 +149,22 @@ export class CanvasPanel {
               .then((html) => post({ type: 'frameContent', id: message.id, html }))
               .catch((err) => deps.logger.error(`frame read failed: ${formatError(err)}`));
             break;
+          case 'commitEdit':
+            // Direct-edit save (M1 item 4): a local write into .design/,
+            // zero API involvement — free (P4). New snapshot, old untouched.
+            void (async () => {
+              if (!this.store) return;
+              const meta = await this.store.commitVersion({
+                html: message.html,
+                prompt: `Direct text edit (${message.editCount} change${message.editCount === 1 ? '' : 's'})`,
+                model: 'local edit',
+                costUsd: 0,
+                promptTokens: null,
+                completionTokens: null,
+              });
+              await this.postFrames(post, meta.id);
+            })().catch((err) => deps.logger.error(`edit commit failed: ${formatError(err)}`));
+            break;
           case 'restore':
             // One-click restore: a local pointer move in .design/ — free (P4).
             void this.store
@@ -190,7 +206,8 @@ export class CanvasPanel {
 }
 
 function toFrameMeta(v: VersionMeta, currentId: string | null): FrameMeta {
-  const cost = v.costUsd !== null ? `$${v.costUsd.toFixed(4)}` : 'cost n/a';
+  // A recorded zero is genuinely free (local edits, :free models) — say so.
+  const cost = v.costUsd === 0 ? 'free' : v.costUsd !== null ? `$${v.costUsd.toFixed(4)}` : 'cost n/a';
   const when = new Date(v.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const promptExcerpt = v.prompt.length > 60 ? `${v.prompt.slice(0, 57)}…` : v.prompt;
   return {

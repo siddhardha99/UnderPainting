@@ -30,6 +30,13 @@ describe('canvas chrome', () => {
     expect(html).toContain('local and free');
   });
 
+  it('ships the direct-edit toggle labeled as local and free (M1 item 4, P4)', () => {
+    const button = html.match(/<button id="edit-text"[^>]*>/);
+    expect(button).not.toBeNull();
+    expect(button![0]).toContain('free');
+    expect(button![0]).toContain('no API call');
+  });
+
   it('ships the chat sidebar with the new/refine mode toggle (M1 item 3)', () => {
     for (const id of ['chat', 'chat-log', 'mode-new', 'mode-refine', 'prompt', 'generate', 'cancel']) {
       expect(html).toContain(`id="${id}"`);
