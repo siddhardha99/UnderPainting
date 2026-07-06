@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { z } from 'zod';
 import { assertWritablePath, DESIGN_DIR } from './writeScope';
 import { ulid } from './ulid';
+import { clarificationsSchema, type Clarifications } from '../../shared/messages';
 
 /**
  * DocumentStore (M1 item 2): the workspace is the truth (P5). Versions are
@@ -34,6 +35,8 @@ export const versionMetaSchema = z
     /** Validator outcome (M1 item 6); absent on pre-validator versions = treated as validated. */
     validated: z.boolean().optional(),
     issues: z.array(z.string()).optional(),
+    /** Clarify-form answers (v0.2 item 1) — recorded for reproducibility. */
+    clarifications: clarificationsSchema.optional(),
   })
   .strict();
 export type VersionMeta = z.infer<typeof versionMetaSchema>;
@@ -66,6 +69,7 @@ export interface CommitInput {
   completionTokens: number | null;
   validated?: boolean;
   issues?: string[];
+  clarifications?: Clarifications;
 }
 
 export class DocumentStore {
@@ -144,6 +148,7 @@ export class DocumentStore {
       prompt: input.prompt,
       validated: input.validated ?? true,
       issues: input.issues ?? [],
+      ...(input.clarifications ? { clarifications: input.clarifications } : {}),
     };
     await fs.writeFile(this.versionPath(meta.id), input.html, 'utf8');
     await this.writeManifest({

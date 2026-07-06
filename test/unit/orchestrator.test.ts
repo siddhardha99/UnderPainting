@@ -25,7 +25,7 @@ function makeDeps(options: {
   const posted: HostToWebview[] = [];
   const logs: string[] = [];
   const unavailableModels: string[] = [];
-  const commits: Array<{ html: string; prompt: string; model: string }> = [];
+  const commits: Array<{ html: string; prompt: string; model: string; clarifications?: unknown }> = [];
   const spends: Array<{ kind: string; model: string; costUsd: number | null }> = [];
   const logger: Logger = { info: (m) => logs.push(m), error: (m) => logs.push(`ERROR ${m}`) };
   const orchestrator = new Orchestrator({
@@ -42,7 +42,13 @@ function makeDeps(options: {
     onModelUnavailable: (id) => unavailableModels.push(id),
     post: (m) => posted.push(m),
     commit: options.withCommit
-      ? async (r) => void commits.push({ html: r.html, prompt: r.prompt, model: r.model })
+      ? async (r) =>
+          void commits.push({
+            html: r.html,
+            prompt: r.prompt,
+            model: r.model,
+            ...(r.clarifications ? { clarifications: r.clarifications } : {}),
+          })
       : undefined,
     recordSpend: (r) => spends.push({ kind: r.kind, model: r.model, costUsd: r.costUsd }),
   });
@@ -204,6 +210,25 @@ describe('Orchestrator (P3: user money, explicit actions only)', () => {
     await failed.ready;
     await failed.orchestrator.generate('will fail');
     expect(failed.commits).toHaveLength(0);
+  });
+
+  it('folds clarify answers into the request and records them in the commit (v0.2 item 1)', async () => {
+    const users: string[] = [];
+    const { orchestrator, commits, ready } = makeDeps({
+      withKey: true,
+      withCommit: true,
+      fetchFn: (async (_url: RequestInfo | URL, init?: RequestInit) => {
+        users.push(JSON.parse(String(init!.body)).messages[1].content);
+        return sse(['data: {"choices":[{"delta":{"content":"<p>x</p>"}}]}\n\n', 'data: [DONE]\n\n']);
+      }) as typeof fetch,
+    });
+    await ready;
+    await orchestrator.generate('a card', { style: 'minimal', variations: 2 });
+    expect(users[0]).toContain('a card');
+    expect(users[0]).toContain('Clarifications from the user (authoritative):');
+    expect(users[0]).toContain('Style direction: minimal');
+    expect(commits[0]!.clarifications).toEqual({ style: 'minimal', variations: 2 });
+    expect(commits[0]!.prompt).toBe('a card'); // original prompt, not the folded one
   });
 
   it('grounds the system prompt in workspace tokens when they exist (M1 item 5)', async () => {

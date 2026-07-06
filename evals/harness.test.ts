@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { loadCases, listArtifacts, scoreArtifact } from './harness';
+import { loadCases, listArtifacts, scoreArtifact, scoreAnalyzer } from './harness';
 
 /**
  * The golden-set merge bar (M1 item 10): reference outputs must pass their
@@ -25,6 +25,13 @@ describe('golden set', () => {
     describe(goldenCase.slug, () => {
       const outputs = listArtifacts(goldenCase.dir, 'outputs');
       const baselines = listArtifacts(goldenCase.dir, 'baselines');
+
+      if (goldenCase.analyzer) {
+        it('clarify-analyzer expectations hold (GATING)', () => {
+          const failures = scoreAnalyzer(goldenCase.analyzer!).filter((r) => !r.pass);
+          expect(failures, failures.map((f) => f.detail).join('\n')).toEqual([]);
+        });
+      }
 
       for (const artifact of outputs) {
         it(`output ${path.basename(artifact)} passes every check (GATING)`, () => {

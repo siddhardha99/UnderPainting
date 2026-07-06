@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { validateArtifact } from '../src/host/validator/Validator';
+import { fieldsToAsk, type ClarifyField } from '../src/shared/clarify';
 
 /**
  * Eval harness v1 (M1 item 10): deterministic structural scoring of golden
@@ -12,11 +13,20 @@ import { validateArtifact } from '../src/host/validator/Validator';
  * - `baselines/*.html` — historical references; scored and reported, never gating.
  */
 
+export interface AnalyzerExpectation {
+  prompt: string;
+  groundingTokensPresent: boolean;
+  mustAsk?: string[];
+  mustNotAsk?: string[];
+}
+
 export interface GoldenCase {
   slug: string;
   dir: string;
   prompt: string;
   checks: Array<{ id: string; kind: string; note?: string }>;
+  /** Clarify-analyzer table (v0.2 item 1) — gating, artifact-free. */
+  analyzer?: AnalyzerExpectation[];
 }
 
 export interface CheckResult {
@@ -35,12 +45,14 @@ export function loadCases(goldenDir: string): GoldenCase[] {
     const parsed = JSON.parse(fs.readFileSync(casePath, 'utf8')) as {
       slug: string;
       checks: GoldenCase['checks'];
+      analyzer?: AnalyzerExpectation[];
     };
     cases.push({
       slug: parsed.slug,
       dir,
       prompt: fs.readFileSync(path.join(dir, 'prompt.txt'), 'utf8').trim(),
       checks: parsed.checks,
+      analyzer: parsed.analyzer,
     });
   }
   return cases;
@@ -139,6 +151,27 @@ export function scoreArtifact(goldenCase: GoldenCase, html: string): CheckResult
     }
   }
   return results;
+}
+
+/** Score a clarify-analyzer table: asked fields must match the licensing expectations. */
+export function scoreAnalyzer(expectations: AnalyzerExpectation[]): CheckResult[] {
+  return expectations.map((expectation, index) => {
+    const asked = new Set<ClarifyField>(
+      fieldsToAsk(expectation.prompt, expectation.groundingTokensPresent),
+    );
+    const problems: string[] = [];
+    for (const field of expectation.mustAsk ?? []) {
+      if (!asked.has(field as ClarifyField)) problems.push(`should ask "${field}" but does not`);
+    }
+    for (const field of expectation.mustNotAsk ?? []) {
+      if (asked.has(field as ClarifyField)) problems.push(`asks "${field}" although the prompt answers it`);
+    }
+    return {
+      checkId: `clarify-analyzer[${index}]`,
+      pass: problems.length === 0,
+      detail: problems.length === 0 ? `"${expectation.prompt}" → asks: ${[...asked].join(', ')}` : `"${expectation.prompt}": ${problems.join('; ')}`,
+    };
+  });
 }
 
 function result(checkId: string, pass: boolean, issues: Array<{ message: string }>): CheckResult {
