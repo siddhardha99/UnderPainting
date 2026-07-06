@@ -43,6 +43,10 @@
       {
         "command": "underpainting.showCostLedger",
         "title": "Underpainting: Show Cost Ledger"
+      },
+      {
+        "command": "underpainting.exportDesign",
+        "title": "Underpainting: Export Design (HTML / Handoff)"
       }
     ],
     "configuration": {

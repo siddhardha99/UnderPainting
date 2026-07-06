@@ -16,6 +16,15 @@ import {
 } from './host/extractor/DesignSystemExtractor';
 import { SystemStore } from './host/store/SystemStore';
 import { CostLedger } from './host/store/CostLedger';
+import { DocumentStore, PROJECT_SLUG } from './host/store/DocumentStore';
+import { ExportWriter } from './host/store/ExportWriter';
+import {
+  buildHandoffJson,
+  buildHandoffMd,
+  planWrites,
+  wrapInBrowserFrame,
+  type PlannedWrite,
+} from './host/export/handoff';
 
 /**
  * Activation is lazy and does no work (≤500ms budget, M0 task 1): commands
@@ -128,7 +137,154 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('underpainting.showCostLedger', () =>
       showCostLedger(getServices()),
     ),
+    vscode.commands.registerCommand('underpainting.exportDesign', () =>
+      exportDesign(getServices(), context),
+    ),
   );
+}
+
+/**
+ * Export & handoff (M1 item 9). Entirely local and free. Writes land at a
+ * user-chosen path OUTSIDE .design/, so P9 applies in full: every write is
+ * classified (new / changed / identical), previewable as a diff, and only
+ * performed after explicit confirmation.
+ */
+async function exportDesign(services: Services, context: vscode.ExtensionContext): Promise<void> {
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!workspaceRoot) {
+    void vscode.window.showErrorMessage('Underpainting: open a folder with saved designs first.');
+    return;
+  }
+  const store = new DocumentStore(workspaceRoot);
+  const { versions, currentId } = await store.listVersions();
+  const version = versions.find((v) => v.id === currentId);
+  if (!version) {
+    void vscode.window.showErrorMessage('Underpainting: no saved design versions to export yet.');
+    return;
+  }
+  const artifactHtml = await store.readVersion(version.id);
+
+  const kind = await vscode.window.showQuickPick(
+    [
+      { label: 'Standalone HTML', description: 'index.html only — renders anywhere', id: 'html' },
+      { label: 'Standalone HTML in a browser frame', description: 'presentation wrapper (scaffold)', id: 'framed' },
+      {
+        label: 'Handoff package',
+        description: 'index.html + HANDOFF.md + handoff.json — an executable spec for a coding agent',
+        id: 'handoff',
+      },
+    ] as const,
+    { title: 'Underpainting: export the current design (local, free)' },
+  );
+  if (!kind) return;
+
+  const folderPick = await vscode.window.showOpenDialog({
+    canSelectFiles: false,
+    canSelectFolders: true,
+    canSelectMany: false,
+    openLabel: 'Export here',
+    title: 'Choose the export destination folder',
+  });
+  const targetDir = folderPick?.[0]?.fsPath;
+  if (!targetDir) return;
+
+  const systemStore = new SystemStore(workspaceRoot);
+  const extensionVersion =
+    (context.extension.packageJSON as { version?: string }).version ?? '0.0.0';
+  const input = {
+    projectSlug: PROJECT_SLUG,
+    artifactHtml,
+    version,
+    history: versions,
+    tokensCss: await systemStore.readTokensCss(),
+    componentsMd: null as string | null,
+    extensionVersion,
+  };
+  try {
+    input.componentsMd = await fs.readFile(
+      path.join(workspaceRoot, '.design', 'system', 'components.md'),
+      'utf8',
+    );
+  } catch {
+    // no inventory extracted — fine
+  }
+
+  const files: Array<{ relative: string; content: string }> = [];
+  if (kind.id === 'html') {
+    files.push({ relative: 'index.html', content: artifactHtml });
+  } else if (kind.id === 'framed') {
+    const frame = await fs.readFile(
+      path.join(context.extensionUri.fsPath, 'scaffolds', 'browser-frame.html'),
+      'utf8',
+    );
+    files.push({
+      relative: 'index.html',
+      content: wrapInBrowserFrame(frame, artifactHtml, `${PROJECT_SLUG} — Underpainting export`),
+    });
+  } else {
+    files.push(
+      { relative: 'index.html', content: artifactHtml },
+      { relative: 'HANDOFF.md', content: buildHandoffMd(input) },
+      { relative: 'handoff.json', content: buildHandoffJson(input) },
+    );
+  }
+
+  const plan = await planWrites(files, async (relative) => {
+    try {
+      return await fs.readFile(path.join(targetDir, relative), 'utf8');
+    } catch {
+      return null;
+    }
+  });
+  const toWrite = plan.filter((p) => p.status !== 'identical');
+  if (toWrite.length === 0) {
+    void vscode.window.showInformationMessage('Underpainting: export is already up to date — nothing to write.');
+    return;
+  }
+
+  // P9: diff preview + explicit confirmation before any write outside .design/.
+  for (;;) {
+    const summary = toWrite
+      .map((p) => `${p.status === 'changed' ? 'overwrite' : 'create'} ${p.relative}`)
+      .join(', ');
+    const choice = await vscode.window.showWarningMessage(
+      `Underpainting export to ${targetDir}: ${summary}.`,
+      { modal: true },
+      'Write files',
+      'Preview changes',
+    );
+    if (choice === undefined) return;
+    if (choice === 'Write files') break;
+    await previewPlan(toWrite);
+  }
+
+  await new ExportWriter().writeConfirmed(
+    toWrite.map((p) => ({ absolutePath: path.join(targetDir, p.relative), content: p.content })),
+    true,
+  );
+  void vscode.window.showInformationMessage(
+    `Underpainting: exported ${toWrite.length} file(s) to ${targetDir} — local, free.`,
+  );
+}
+
+async function previewPlan(plan: PlannedWrite[]): Promise<void> {
+  for (const file of plan) {
+    const proposed = await vscode.workspace.openTextDocument({
+      content: file.content,
+      language: file.relative.endsWith('.json') ? 'json' : file.relative.endsWith('.md') ? 'markdown' : 'html',
+    });
+    if (file.status === 'changed' && file.existing !== undefined) {
+      const existing = await vscode.workspace.openTextDocument({ content: file.existing });
+      await vscode.commands.executeCommand(
+        'vscode.diff',
+        existing.uri,
+        proposed.uri,
+        `${file.relative}: existing ↔ export`,
+      );
+    } else {
+      await vscode.window.showTextDocument(proposed, { preview: true });
+    }
+  }
 }
 
 /** Cost ledger summary (M1 item 8): local file read, free. */
