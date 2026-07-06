@@ -12,6 +12,10 @@ Deferred decisions per BUILD_BRIEF.md §14 — agents append context here and ta
 6. **Remote development (WSL/SSH/Dev Containers) posture.** Affects SecretStorage and webview behavior. Needs investigation-and-report, not a decision. Untouched in M0.
 7. **v0.3 (images) vs v0.4 (integration agent) ordering.** Decided by alpha-user demand.
 
+## Raised during M1
+
+11. **Workspace-canvas polish (deferred scope).** Infinite pan/zoom surface, free-form drag-arrange, minimap, and frame grouping are explicitly **deferred to post-alpha** by the human decision recorded in [ADR-009](adr/009-frame-native-canvas.md). They are a v0.2 headline candidate, to be decided from alpha-user feedback at the item-10 review checkpoint. What ships in v0.1: frame-native architecture (versions are frames; selection model; chat/editing target the selected frame), wrapping flow layout, zoom/fit, live-iframe budget.
+
 ## Raised during M0 — all resolved at M0 review (2026-07-06)
 
 8. **How legitimate artifact `<script>`s will run post-M0.** ~~Open~~ **Resolved:** keep stripping scripts during streaming; on commit of a complete, *validated* artifact, render it in the sandboxed iframe (opaque origin, no `allow-same-origin`) with scripts enabled. Re-assert the hostile fixture against the scripts-enabled commit path — it currently passes partly because scripts are removed rather than contained. Scheduled inside M1 item 6 (Validator), not as a hotfix. Recorded in ADR-002 addendum.
