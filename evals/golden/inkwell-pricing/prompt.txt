@@ -1,0 +1,1 @@
+A pricing page for a note-taking app called Inkwell, with three plan cards side by side — Free, Pro ($8/mo), and Team ($20/mo) — each with a short feature list, and the Pro card visually highlighted as the recommended plan
