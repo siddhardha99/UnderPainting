@@ -14,7 +14,7 @@ const NETWORK_MODULES = [
 export default [
   { ignores: ['dist/**', 'out-test/**', 'node_modules/**', '**/*.mjs', '.vscode-test/**'] },
   {
-    files: ['src/**/*.ts', 'test/**/*.ts'],
+    files: ['src/**/*.ts', 'test/**/*.ts', 'evals/**/*.ts'],
     languageOptions: {
       parser: tseslint.parser,
     },
@@ -31,8 +31,9 @@ export default [
     },
   },
   {
-    // Tests may stub network primitives to prove they are never hit.
-    files: ['test/**/*.ts'],
+    // Tests may stub network primitives to prove they are never hit; eval
+    // suites reach the network only through the real OpenRouterClient.
+    files: ['test/**/*.ts', 'evals/**/*.ts'],
     rules: {
       'no-restricted-globals': 'off',
     },

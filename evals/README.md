@@ -1,6 +1,18 @@
 # Evals
 
-The eval harness itself (runner + deterministic scorers in CI) arrives with **M1 item 10** (BUILD_BRIEF.md §11). Golden cases accumulate here beforehand as data — every case added with a milestone is scored once the harness lands, and from then on prompt-changing PRs must not regress the set (the community merge bar).
+The eval harness (M1 item 10) scores golden cases with deterministic structural checks — **the community merge bar**: prompt-changing PRs must not regress the set.
+
+## Running
+
+```sh
+npm run evals                # deterministic scoring — runs on every PR in CI
+OPENROUTER_EVAL_KEY=sk-or-… OPENROUTER_EVAL_MODEL=<model-id> npm run evals
+                             # + LIVE generation of every case (paid, opt-in):
+                             # writes <case>/outputs/live-<model>.html, scores it,
+                             # and runs the A7 targeted-edit minimality check
+```
+
+Scoring rules per case directory: `outputs/*.html` **must pass every case check (gating)**; `baselines/*.html` are historical references — scored, reported in the log, never gating. Committing a live run's output into `outputs/` is how new generation behavior enters the merge bar. Whose key funds live runs in shared CI is an open question (brief §14; docs/OPEN_QUESTIONS.md #5).
 
 ## Golden case format
 

@@ -93,4 +93,4 @@ The **design budget for activation is ≤500ms** with no work before the first c
 | P7 one-minute audit | PRIVACY-drift check inside `allowlist.test.ts` |
 | §4 dependency budget | `test/invariants/dep-budget.test.ts` |
 
-Not yet built (M1 items 2+): DocumentStore, chat panel, direct editing, DesignSystemExtractor, Validator, scaffolds copy-in, CostLedger, export/handoff, eval harness runner. See BUILD_BRIEF.md §11.
+M1 backlog status: items 1–10 implemented (model catalog, DocumentStore/frames, chat+refinement, direct editing, extractor+grounding, validator+corrections, scaffolds, cost ledger + status-bar credits, export/handoff, eval harness). Remaining for v0.1 release: human decisions in docs/OPEN_QUESTIONS.md and the launch-readiness items from the item-10 review.

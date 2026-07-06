@@ -28,6 +28,9 @@ jobs:
       - name: Unit + invariant tests
         run: npm run test:unit
 
+      - name: Golden-set evals (deterministic — the prompt-change merge bar)
+        run: npm run evals
+
       - name: Build
         run: npm run build
 

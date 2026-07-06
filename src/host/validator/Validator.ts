@@ -176,11 +176,11 @@ function topLevelSelectors(css: string): string[] {
   return selectors;
 }
 
-/** A base reset targets elements/universal only — no classes, ids, or attributes. */
+/** A base reset targets elements/universal (with optional pseudo-elements) — no classes, ids, or attributes. */
 function isBaseResetSelector(selector: string): boolean {
   return selector
     .split(',')
-    .every((part) => /^\s*(\*|[a-z][a-z0-9]*)(\s*,)?\s*$/i.test(part.trim()));
+    .every((part) => /^\s*(\*|[a-z][a-z0-9]*)(::?[a-z-]+)*\s*$/i.test(part.trim()));
 }
 
 interface OpenElement {
