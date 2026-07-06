@@ -231,7 +231,7 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
       <div id="board" role="list" aria-label="Design frames"></div>
     </main>
   </div>
-  <template id="frame-template">
+  <template id="frame-template" data-nonce="${o.nonce}">
     <div class="frame" role="listitem" tabindex="0">
       <div class="frame-header">
         <span class="frame-title"></span>

@@ -6,6 +6,7 @@ import {
   type WebviewToHost,
 } from '../../shared/messages';
 import { spliceTextEdit } from './spliceText';
+import { committedSrcdoc, needsScriptRender } from './commitRender';
 import {
   applyFrames,
   endPending,
@@ -227,6 +228,17 @@ function postToFrame(
 
 function setFrameHtml(card: FrameCard, html: string): void {
   card.html = html;
+  // ADR-002 commit path: only a VALIDATED, committed artifact that contains
+  // scripts renders as its own document (scripts enabled, same sandbox +
+  // CSP). Streaming and unvalidated content always goes through the
+  // sanitizing morph renderer. Dormant in v0.1 — the validator bans scripts.
+  const meta = state.frames.find((f) => f.id === card.id);
+  if (card.id !== PENDING_ID && meta?.validated && needsScriptRender(html) && card.iframe) {
+    const nonce = frameTemplate.dataset['nonce'] ?? '';
+    card.iframe.srcdoc = committedSrcdoc(html, nonce);
+    card.iframeLoaded = false; // document render replaces the bootstrap; no patch flush
+    return;
+  }
   if (card.iframe && card.iframeLoaded) {
     postToFrame(card, { type: 'patch', html });
   }
@@ -283,7 +295,7 @@ function render(): void {
   }
   for (const frame of state.frames) {
     const card = cards.get(frame.id) ?? createCard(frame.id);
-    card.title.textContent = frame.title;
+    card.title.textContent = (frame.validated ? '' : '⚠ ') + frame.title;
     card.subtitle.textContent = frame.subtitle;
     card.badge.hidden = !frame.isCurrent;
     card.restoreButton.hidden = frame.isCurrent;
@@ -442,6 +454,21 @@ window.addEventListener('message', (event: MessageEvent) => {
         setStatus('No API key set — run “Underpainting: Set OpenRouter API Key”. The canvas stays read-only until then.');
       }
       break;
+    case 'validation': {
+      // Issues that survived the correction cap: surfaced, never silent (§7).
+      const summary =
+        message.issues.length === 0
+          ? `Validator clean after ${message.correctionPasses} correction pass${message.correctionPasses === 1 ? '' : 'es'}.`
+          : `⚠ ${message.issues.length} authoring issue${message.issues.length === 1 ? '' : 's'} remain${message.issues.length === 1 ? 's' : ''} after ${message.correctionPasses} correction pass${message.correctionPasses === 1 ? '' : 'es'}.`;
+      setStatus(summary, message.issues.length > 0);
+      if (message.issues.length > 0) {
+        const bubble = chatBubble('error', `${summary}\n• ${message.issues.join('\n• ')}`);
+        bubble.style.whiteSpace = 'pre-wrap';
+        chatLog.appendChild(bubble);
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+      break;
+    }
     case 'modelState': {
       const note = document.getElementById('model-note') as HTMLDivElement;
       if (!message.modelId) {

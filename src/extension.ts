@@ -30,6 +30,7 @@ interface Services {
   loadCorePrompt: () => Promise<string>;
   loadRefineRecipe: () => Promise<string>;
   loadGroundingPreamble: () => Promise<string>;
+  loadCorrectionRecipe: () => Promise<string>;
   /** Catalog pricing captured when the user picked the model — display only, never refetched (P3). */
   getModelPricing: (modelId: string) => string | undefined;
   cacheModelPricing: (modelId: string, detail: string) => Promise<void>;
@@ -54,6 +55,8 @@ export function activate(context: vscode.ExtensionContext): void {
           fs.readFile(path.join(context.extensionUri.fsPath, 'prompts', 'refine.md'), 'utf8'),
         loadGroundingPreamble: () =>
           fs.readFile(path.join(context.extensionUri.fsPath, 'prompts', 'grounding.md'), 'utf8'),
+        loadCorrectionRecipe: () =>
+          fs.readFile(path.join(context.extensionUri.fsPath, 'prompts', 'correct.md'), 'utf8'),
         getModelPricing: (modelId) =>
           context.globalState.get<string>(`underpainting.pricing.${modelId}`),
         cacheModelPricing: (modelId, detail) =>
@@ -68,6 +71,7 @@ export function activate(context: vscode.ExtensionContext): void {
       CanvasPanel.createOrShow(context, {
         ...getServices(),
         getGenerationModel: () => getConfiguredModel('generationModel'),
+        getValidationModel: () => getConfiguredModel('validationModel'),
         getModelPricing: (modelId) => getServices().getModelPricing(modelId),
         onModelUnavailable: (modelId) => void offerModelSwitch(getServices(), modelId),
       }),

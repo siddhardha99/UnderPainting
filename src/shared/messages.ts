@@ -51,6 +51,8 @@ export const frameMetaSchema = z
     /** The full prompt/instruction that produced this version (chat user bubble). */
     prompt: z.string(),
     isCurrent: z.boolean(),
+    /** False when validator issues survived the correction cap (badge on the frame). */
+    validated: z.boolean(),
   })
   .strict();
 export type FrameMeta = z.infer<typeof frameMetaSchema>;
@@ -83,6 +85,15 @@ export const hostToWebviewSchema = z.discriminatedUnion('type', [
     .strict(),
   // Snapshot content for one frame, in response to requestFrame.
   z.object({ type: z.literal('frameContent'), id: frameId, html: z.string() }).strict(),
+  // Validator outcome for the just-committed generation (M1 item 6): issues
+  // that survived the bounded correction loop are surfaced, never silent.
+  z
+    .object({
+      type: z.literal('validation'),
+      issues: z.array(z.string()).max(64),
+      correctionPasses: z.number().int().min(0),
+    })
+    .strict(),
   // The active generation model + its catalog pricing (cached at pick time,
   // never fetched for display — P3), shown at the point of spend (P4).
   z

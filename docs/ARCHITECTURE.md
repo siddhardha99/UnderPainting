@@ -10,7 +10,12 @@ Extension Host (Node)
 │     usage/cost readers (stream usage + /generation fallback) · /models catalog
 ├─ Model catalog        src/host/models/      pure helpers: pricing display,
 │     deprecation → suggested-equivalent ranking (never a silent switch)
-├─ Orchestrator         src/host/orchestrator/ prompt → stream → cost → commit
+├─ Orchestrator         src/host/orchestrator/ prompt → stream → validate →
+│     correct (≤ CORRECTION_RETRY_CAP on the cheap validation model) → cost → commit
+├─ Validator            src/host/validator/   §7 as deterministic checks (no DOM,
+│     no deps): structure, A1 token-referencing + style-block contents, A2 leaf
+│     rule, A3 self-containment, A4 explicit dimensions, script ban; A7
+│     refinement-survival warning; surviving issues surfaced, never silent
 ├─ DocumentStore        src/host/store/       immutable version snapshots + manifest;
 │     commits only complete states — cancelled/failed streams never touch disk
 ├─ DesignSystemExtractor src/host/extractor/  READ-ONLY heuristic scan: :root/html
@@ -49,6 +54,12 @@ Canvas Webview (sandboxed)                    src/webview/canvas/
 `Generate` click → `generate` message → Orchestrator streams from OpenRouter → each accumulated buffer passes `extractHtml` (fence/prose stripping) → `streamChunk` posts (throttled ~30ms) → canvas forwards to the artifact iframe → bootstrap parses with `DOMParser` and **morphs** the live DOM (index-based diff, `src/webview/artifact/morph.ts`) — no full reload, stable node identity, so completed content doesn't flicker while later content streams.
 
 Cost is read from OpenRouter's `usage` accounting on the final SSE frame (requested via `usage: {include: true}`); if absent, one follow-up `GET /api/v1/generation` reads the recorded cost (bounded: capped attempts, per-attempt timeout). It is never estimated.
+
+## Validator + correction loop (M1 item 6)
+
+Every completed generation is validated (`src/host/validator/Validator.ts` — pure string/tokenizer checks; the host has no DOM and the dependency budget stays at 1). Violations trigger correction passes on the **validation model** with minimal context (`prompts/correct.md` is the entire system prompt — a verifier in miniature, §8), hard-capped at `CORRECTION_RETRY_CAP`; costs from every pass are **summed** into the exact figure shown. No validation model configured → no correction spend, issues surfaced directly. Whatever survives the cap commits anyway (the user paid for it) with `validated: false` — a ⚠ badge on the frame and the issue list in chat. A7: targeted refinements get a line-survival check; a rewrite above threshold is a surfaced *warning*, never a correction trigger (same instruction → same result → wasted money). Direct edits re-validate locally (free).
+
+**ADR-002 scripts-enabled commit path** is implemented and deliberately dormant: a *validated* committed artifact containing `<script>` renders as its own document (inline scripts nonce-injected — `src/webview/canvas/commitRender.ts`) inside the unchanged sandbox + CSP. In v0.1 the validator rejects all scripts, so nothing reaches it; the hostile fixture can never validate (tested), and streaming always uses the stripping morph renderer.
 
 ## Design-system grounding (M1 item 5)
 

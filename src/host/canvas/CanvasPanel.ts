@@ -12,6 +12,7 @@ import { DESIGN_DIR } from '../store/writeScope';
 import { DocumentStore, type VersionMeta } from '../store/DocumentStore';
 import { SystemStore } from '../store/SystemStore';
 import { checkDrift } from '../extractor/DesignSystemExtractor';
+import { validateArtifact } from '../validator/Validator';
 
 export interface CanvasDeps {
   client: OpenRouterClient;
@@ -21,7 +22,9 @@ export interface CanvasDeps {
   loadCorePrompt: () => Promise<string>;
   loadRefineRecipe: () => Promise<string>;
   loadGroundingPreamble: () => Promise<string>;
+  loadCorrectionRecipe: () => Promise<string>;
   getGenerationModel: () => string | undefined;
+  getValidationModel: () => string | undefined;
   /** Pricing cached when the model was picked; undefined when hand-edited into settings. */
   getModelPricing: (modelId: string) => string | undefined;
   onModelUnavailable: (modelId: string) => void;
@@ -131,8 +134,10 @@ export class CanvasPanel {
       loadCorePrompt: deps.loadCorePrompt,
       loadRefineRecipe: deps.loadRefineRecipe,
       loadGroundingPreamble: deps.loadGroundingPreamble,
+      loadCorrectionRecipe: deps.loadCorrectionRecipe,
       loadGroundingTokens: async () => (systemStore ? systemStore.readTokensCss() : null),
       getGenerationModel: deps.getGenerationModel,
+      getValidationModel: deps.getValidationModel,
       onModelUnavailable: deps.onModelUnavailable,
       post,
       commit: this.store
@@ -203,6 +208,9 @@ export class CanvasPanel {
             // zero API involvement — free (P4). New snapshot, old untouched.
             void (async () => {
               if (!this.store) return;
+              // Re-validate the edited document (free, local) so the frame's
+              // validated badge stays truthful after splices.
+              const issues = validateArtifact(message.html).map((i) => `[${i.rule}] ${i.message}`);
               const meta = await this.store.commitVersion({
                 html: message.html,
                 prompt: `Direct text edit (${message.editCount} change${message.editCount === 1 ? '' : 's'})`,
@@ -210,6 +218,8 @@ export class CanvasPanel {
                 costUsd: 0,
                 promptTokens: null,
                 completionTokens: null,
+                validated: issues.length === 0,
+                issues,
               });
               await this.postFrames(post, meta.id);
             })().catch((err) => deps.logger.error(`edit commit failed: ${formatError(err)}`));
@@ -265,5 +275,6 @@ function toFrameMeta(v: VersionMeta, currentId: string | null): FrameMeta {
     subtitle: `${when} · ${promptExcerpt}`,
     prompt: v.prompt,
     isCurrent: v.id === currentId,
+    validated: v.validated ?? true,
   };
 }

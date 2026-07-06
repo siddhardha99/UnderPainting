@@ -49,7 +49,7 @@ describe('canvas chrome', () => {
 
   it('ships the frame board and the frame clone template', () => {
     expect(html).toContain('id="board"');
-    expect(html).toContain('<template id="frame-template">');
+    expect(html).toContain('<template id="frame-template"');
     expect(html.match(/<iframe/g)!.length).toBe(1); // only the template's
   });
 });

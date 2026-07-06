@@ -13,6 +13,7 @@ function makeDeps(options: {
   model?: string | undefined | 'unset';
   withCommit?: boolean;
   groundingTokens?: string;
+  validationModel?: string;
 }) {
   const backing = new Map<string, string>();
   const secrets: SecretStorageLike = {
@@ -33,7 +34,9 @@ function makeDeps(options: {
     loadCorePrompt: async () => 'core prompt',
     loadRefineRecipe: async () => 'refine recipe',
     loadGroundingPreamble: async () => 'grounding preamble',
+    loadCorrectionRecipe: async () => 'correction recipe',
     loadGroundingTokens: async () => options.groundingTokens ?? null,
+    getValidationModel: () => options.validationModel,
     getGenerationModel: () => (options.model === 'unset' ? undefined : (options.model ?? 'test/model')),
     onModelUnavailable: (id) => unavailableModels.push(id),
     post: (m) => posted.push(m),
@@ -296,6 +299,86 @@ describe('Orchestrator (P3: user money, explicit actions only)', () => {
     await ready;
     await orchestrator.generate('a card');
     expect(unavailableModels).toEqual([]);
+  });
+
+  it('runs the bounded correction loop on the validation model and sums exact costs (M1 item 6)', async () => {
+    const INVALID = '<!doctype html><html><head><style>:root { --ink: #111; }</style></head>' +
+      '<body><p style="color: #ff0000">raw</p></body></html>';
+    const FIXED = INVALID.replace('color: #ff0000', 'color: var(--ink)');
+    const calls: Array<{ model: string; system: string }> = [];
+    const { orchestrator, posted, commits, ready } = makeDeps({
+      withKey: true,
+      withCommit: true,
+      validationModel: 'cheap/fixer',
+      fetchFn: (async (_url: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(String(init!.body));
+        calls.push({ model: body.model, system: body.messages[0].content });
+        const text = body.model === 'cheap/fixer' ? FIXED : INVALID;
+        return sse([
+          `data: {"id":"g${calls.length}","choices":[{"delta":{"content":${JSON.stringify(text)}}}],"usage":{"prompt_tokens":10,"completion_tokens":20,"cost":0.01}}\n\n`,
+          'data: [DONE]\n\n',
+        ]);
+      }) as typeof fetch,
+    });
+    await ready;
+    await orchestrator.generate('a card');
+
+    expect(calls.map((c) => c.model)).toEqual(['test/model', 'cheap/fixer']);
+    // Correction pass runs on its own minimal recipe, not the core prompt (§8).
+    expect(calls[1]!.system).toBe('correction recipe');
+    expect(commits[0]!.html).toBe(FIXED);
+    const done = posted.find((m) => m.type === 'streamDone') as Extract<HostToWebview, { type: 'streamDone' }>;
+    expect(done.costUsd).toBeCloseTo(0.02); // exact sum across passes
+    const validation = posted.find((m) => m.type === 'validation') as Extract<HostToWebview, { type: 'validation' }>;
+    expect(validation.correctionPasses).toBe(1);
+    expect(validation.issues).toEqual([]);
+  });
+
+  it('caps corrections and surfaces surviving issues, never silently accepting (§7/§9)', async () => {
+    const INVALID = '<!doctype html><html><head><style>:root { --ink: #111; }</style></head>' +
+      '<body><p style="color: #ff0000">raw</p></body></html>';
+    let calls = 0;
+    const { orchestrator, posted, commits, ready } = makeDeps({
+      withKey: true,
+      withCommit: true,
+      validationModel: 'cheap/fixer',
+      fetchFn: (async () => {
+        calls++;
+        return sse([
+          `data: {"choices":[{"delta":{"content":${JSON.stringify(INVALID)}}}],"usage":{"cost":0.01}}\n\n`,
+          'data: [DONE]\n\n',
+        ]);
+      }) as typeof fetch,
+    });
+    await ready;
+    await orchestrator.generate('a card');
+
+    expect(calls).toBe(1 + CORRECTION_RETRY_CAP); // hard cap: generation + 2 corrections
+    const validation = posted.find((m) => m.type === 'validation') as Extract<HostToWebview, { type: 'validation' }>;
+    expect(validation.issues.length).toBeGreaterThan(0);
+    expect(commits[0]).toBeDefined(); // still committed — the user paid for it
+  });
+
+  it('skips corrections entirely when no validation model is configured', async () => {
+    const INVALID = '<!doctype html><html><head><style>:root { --x: 1; }</style></head>' +
+      '<body><p style="color: #ff0000">raw</p></body></html>';
+    let calls = 0;
+    const { orchestrator, posted, ready } = makeDeps({
+      withKey: true,
+      withCommit: true,
+      fetchFn: (async () => {
+        calls++;
+        return sse([
+          `data: {"choices":[{"delta":{"content":${JSON.stringify(INVALID)}}}]}\n\n`,
+          'data: [DONE]\n\n',
+        ]);
+      }) as typeof fetch,
+    });
+    await ready;
+    await orchestrator.generate('a card');
+    expect(calls).toBe(1); // no correction spend without an explicit model choice
+    const validation = posted.find((m) => m.type === 'validation') as Extract<HostToWebview, { type: 'validation' }>;
+    expect(validation.issues.length).toBeGreaterThan(0);
   });
 
   it('keeps the correction retry cap bounded (§9)', () => {
