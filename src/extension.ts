@@ -15,6 +15,7 @@ import {
   ExtractionCancelledError,
 } from './host/extractor/DesignSystemExtractor';
 import { SystemStore } from './host/store/SystemStore';
+import { CostLedger } from './host/store/CostLedger';
 
 /**
  * Activation is lazy and does no work (≤500ms budget, M0 task 1): commands
@@ -39,6 +40,32 @@ interface Services {
 
 export function activate(context: vscode.ExtensionContext): void {
   let services: Services | undefined;
+  let creditsStatusBar: vscode.StatusBarItem | undefined;
+
+  // Status-bar credits (M1 item 8, §9): refreshed only after user-initiated
+  // API activity or key changes — never on activation, never on a timer (P3).
+  const refreshCredits = async (): Promise<void> => {
+    const s = getServices();
+    const key = await s.keyVault.getKey();
+    if (!key) {
+      creditsStatusBar?.hide();
+      return;
+    }
+    try {
+      const credits = await s.client.getCredits(key);
+      if (!creditsStatusBar) {
+        creditsStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 90);
+        creditsStatusBar.name = 'Underpainting credits';
+        creditsStatusBar.command = 'underpainting.showCostLedger';
+        context.subscriptions.push(creditsStatusBar);
+      }
+      creditsStatusBar.text = `$(paintcan) $${credits.remaining.toFixed(2)}`;
+      creditsStatusBar.tooltip = `OpenRouter credits remaining: $${credits.remaining.toFixed(4)} — click for the Underpainting cost ledger`;
+      creditsStatusBar.show();
+    } catch (err) {
+      s.logger.error(`credits refresh failed: ${formatError(err)}`);
+    }
+  };
   const getServices = (): Services => {
     if (!services) {
       const redactor = new SecretRedactor();
@@ -77,9 +104,12 @@ export function activate(context: vscode.ExtensionContext): void {
         getValidationModel: () => getConfiguredModel('validationModel'),
         getModelPricing: (modelId) => getServices().getModelPricing(modelId),
         onModelUnavailable: (modelId) => void offerModelSwitch(getServices(), modelId),
+        onRequestCompleted: () => void refreshCredits(),
       }),
     ),
-    vscode.commands.registerCommand('underpainting.setApiKey', () => setApiKey(getServices())),
+    vscode.commands.registerCommand('underpainting.setApiKey', () =>
+      setApiKey(getServices(), refreshCredits),
+    ),
     vscode.commands.registerCommand('underpainting.clearApiKey', async () => {
       await getServices().keyVault.deleteKey();
       void vscode.window.showInformationMessage(
@@ -95,6 +125,35 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('underpainting.extractDesignSystem', () =>
       extractSystem(getServices()),
     ),
+    vscode.commands.registerCommand('underpainting.showCostLedger', () =>
+      showCostLedger(getServices()),
+    ),
+  );
+}
+
+/** Cost ledger summary (M1 item 8): local file read, free. */
+async function showCostLedger(services: Services): Promise<void> {
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!workspaceRoot) {
+    void vscode.window.showInformationMessage(
+      'Underpainting: no folder open — the spend ledger lives in the workspace at .design/ledger.jsonl.',
+    );
+    return;
+  }
+  const summary = await new CostLedger(workspaceRoot).summary();
+  const lines = [
+    `Underpainting cost ledger — ${workspaceRoot}/.design/ledger.jsonl (gitignored, personal)`,
+    `  total recorded spend: $${summary.totalUsd.toFixed(4)} across ${summary.records} request(s)` +
+      (summary.unpriced > 0 ? ` (${summary.unpriced} without a reported cost, excluded)` : ''),
+    `  generations: ${summary.byKind.generation.records} — $${summary.byKind.generation.totalUsd.toFixed(4)}`,
+    `  refinements: ${summary.byKind.refinement.records} — $${summary.byKind.refinement.totalUsd.toFixed(4)}`,
+    `  corrections: ${summary.byKind.correction.records} — $${summary.byKind.correction.totalUsd.toFixed(4)}`,
+  ];
+  for (const line of lines) {
+    services.logger.info(line);
+  }
+  void vscode.window.showInformationMessage(
+    `Underpainting spend in this project: $${summary.totalUsd.toFixed(4)} over ${summary.records} request(s). Details in the Underpainting output channel.`,
   );
 }
 
@@ -249,7 +308,7 @@ async function offerModelSwitch(services: Services, missingId: string): Promise<
   );
 }
 
-async function setApiKey(services: Services): Promise<void> {
+async function setApiKey(services: Services, onKeyValidated: () => Promise<void>): Promise<void> {
   const { keyVault, client, redactor, logger } = services;
 
   const entered = await vscode.window.showInputBox({
@@ -272,6 +331,7 @@ async function setApiKey(services: Services): Promise<void> {
       () => client.getCredits(key),
     );
     await keyVault.setKey(key);
+    await onKeyValidated();
     void vscode.window.showInformationMessage(
       `Underpainting: key saved. Remaining OpenRouter credits: $${credits.remaining.toFixed(2)}.`,
     );

@@ -26,6 +26,7 @@ function makeDeps(options: {
   const logs: string[] = [];
   const unavailableModels: string[] = [];
   const commits: Array<{ html: string; prompt: string; model: string }> = [];
+  const spends: Array<{ kind: string; model: string; costUsd: number | null }> = [];
   const logger: Logger = { info: (m) => logs.push(m), error: (m) => logs.push(`ERROR ${m}`) };
   const orchestrator = new Orchestrator({
     client: new OpenRouterClient({ fetchFn: options.fetchFn }),
@@ -43,9 +44,10 @@ function makeDeps(options: {
     commit: options.withCommit
       ? async (r) => void commits.push({ html: r.html, prompt: r.prompt, model: r.model })
       : undefined,
+    recordSpend: (r) => spends.push({ kind: r.kind, model: r.model, costUsd: r.costUsd }),
   });
   const ready = options.withKey ? keyVault.setKey(KEY) : Promise.resolve();
-  return { orchestrator, posted, logs, ready, unavailableModels, commits };
+  return { orchestrator, posted, logs, ready, unavailableModels, commits, spends };
 }
 
 function sse(frames: string[]): Response {
@@ -306,7 +308,7 @@ describe('Orchestrator (P3: user money, explicit actions only)', () => {
       '<body><p style="color: #ff0000">raw</p></body></html>';
     const FIXED = INVALID.replace('color: #ff0000', 'color: var(--ink)');
     const calls: Array<{ model: string; system: string }> = [];
-    const { orchestrator, posted, commits, ready } = makeDeps({
+    const { orchestrator, posted, commits, ready, spends } = makeDeps({
       withKey: true,
       withCommit: true,
       validationModel: 'cheap/fixer',
@@ -324,6 +326,11 @@ describe('Orchestrator (P3: user money, explicit actions only)', () => {
     await orchestrator.generate('a card');
 
     expect(calls.map((c) => c.model)).toEqual(['test/model', 'cheap/fixer']);
+    // Ledger hook: one record per request, corrections recorded separately (item 8).
+    expect(spends).toEqual([
+      { kind: 'generation', model: 'test/model', costUsd: 0.01 },
+      { kind: 'correction', model: 'cheap/fixer', costUsd: 0.01 },
+    ]);
     // Correction pass runs on its own minimal recipe, not the core prompt (§8).
     expect(calls[1]!.system).toBe('correction recipe');
     expect(commits[0]!.html).toBe(FIXED);

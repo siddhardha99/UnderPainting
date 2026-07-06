@@ -60,6 +60,16 @@ export interface OrchestratorDeps {
   onModelUnavailable?: (modelId: string) => void;
   /** Posts to the webview; the poster validates and redacts (see createHostPoster). */
   post: (message: HostToWebview) => void;
+  /** Ledger hook (M1 item 8): one record per API request, corrections separate. Fire-and-forget. */
+  recordSpend?: (record: {
+    kind: 'generation' | 'refinement' | 'correction';
+    model: string;
+    costUsd: number | null;
+    promptTokens: number | null;
+    completionTokens: number | null;
+  }) => void;
+  /** Called after a run's API activity finishes — the host refreshes status-bar credits (§9). */
+  onRequestCompleted?: () => void;
   /**
    * Persist a COMPLETE generation (P5, commit-only-complete-states): called
    * strictly after the stream finishes successfully and never on cancel or
@@ -86,6 +96,7 @@ interface RunRequest {
   refineBase?: string;
   /** Wraps the streamed fragment into the scaffold shell (A5); identity for refinements. */
   assemble?: (fragment: string) => string;
+  kind: 'generation' | 'refinement';
 }
 
 export class Orchestrator {
@@ -106,6 +117,7 @@ export class Orchestrator {
         system: (await this.deps.loadCorePrompt()) + (await this.groundingSection()),
         user: userPrompt,
         assemble: scaffold ? (fragment: string) => assembleArtifact(scaffold, fragment) : undefined,
+        kind: 'generation' as const,
       };
     });
   }
@@ -137,6 +149,7 @@ export class Orchestrator {
         // pins the untrusted-content framing (§8/§9 prompt-injection stance).
         user: `<<<ARTIFACT\n${baseHtml}\nARTIFACT>>>\n\nInstruction: ${instruction}`,
         refineBase: isRedesignInstruction(instruction) ? undefined : baseHtml,
+        kind: 'refinement' as const,
       };
     });
   }
@@ -210,6 +223,7 @@ export class Orchestrator {
           logger.error(`cost lookup failed: ${formatError(err)}`);
         }
       }
+      this.deps.recordSpend?.({ kind: request.kind, model, costUsd, promptTokens, completionTokens });
 
       let finalHtml = toArtifact(result.text);
 
@@ -245,6 +259,13 @@ export class Orchestrator {
             },
           });
           costUsd = addCost(costUsd, correction.costUsd);
+          this.deps.recordSpend?.({
+            kind: 'correction',
+            model: validationModel,
+            costUsd: correction.costUsd,
+            promptTokens: correction.promptTokens,
+            completionTokens: correction.completionTokens,
+          });
           const correctedHtml = extractHtml(correction.text);
           const correctedIssues = validateArtifact(correctedHtml);
           if (correctedHtml.length === 0 || correctedIssues.length > issues.length) {
@@ -331,6 +352,7 @@ export class Orchestrator {
       }
     } finally {
       this.active = null;
+      this.deps.onRequestCompleted?.();
     }
   }
 

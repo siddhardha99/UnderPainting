@@ -39,6 +39,10 @@
       {
         "command": "underpainting.extractDesignSystem",
         "title": "Underpainting: Extract Design System"
+      },
+      {
+        "command": "underpainting.showCostLedger",
+        "title": "Underpainting: Show Cost Ledger"
       }
     ],
     "configuration": {

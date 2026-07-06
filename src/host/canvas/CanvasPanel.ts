@@ -11,6 +11,7 @@ import { buildCanvasHtml } from './canvasHtml';
 import { DESIGN_DIR } from '../store/writeScope';
 import { DocumentStore, type VersionMeta } from '../store/DocumentStore';
 import { SystemStore } from '../store/SystemStore';
+import { CostLedger } from '../store/CostLedger';
 import { checkDrift } from '../extractor/DesignSystemExtractor';
 import { validateArtifact } from '../validator/Validator';
 
@@ -29,6 +30,8 @@ export interface CanvasDeps {
   /** Pricing cached when the model was picked; undefined when hand-edited into settings. */
   getModelPricing: (modelId: string) => string | undefined;
   onModelUnavailable: (modelId: string) => void;
+  /** Fired when a run's API activity ends — the host refreshes status-bar credits (§9). */
+  onRequestCompleted: () => void;
 }
 
 export class CanvasPanel {
@@ -92,6 +95,7 @@ export class CanvasPanel {
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     this.store = workspaceRoot ? new DocumentStore(workspaceRoot) : null;
     const systemStore = workspaceRoot ? new SystemStore(workspaceRoot) : null;
+    const ledger = workspaceRoot ? new CostLedger(workspaceRoot) : null;
 
     // The point-of-spend disclosure (P4): which model Send will use and what
     // it costs, from pricing cached at pick time — display never fetches (P3).
@@ -141,6 +145,13 @@ export class CanvasPanel {
       getGenerationModel: deps.getGenerationModel,
       getValidationModel: deps.getValidationModel,
       onModelUnavailable: deps.onModelUnavailable,
+      recordSpend: ledger
+        ? (record) =>
+            void ledger
+              .append(record)
+              .catch((err) => deps.logger.error(`ledger append failed: ${formatError(err)}`))
+        : undefined,
+      onRequestCompleted: deps.onRequestCompleted,
       post,
       commit: this.store
         ? async (result) => {
