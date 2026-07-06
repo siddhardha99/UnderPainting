@@ -16,6 +16,8 @@ Deferred decisions per BUILD_BRIEF.md §14 — agents append context here and ta
 
 11. **Workspace-canvas polish (deferred scope).** Infinite pan/zoom surface, free-form drag-arrange, minimap, and frame grouping are explicitly **deferred to post-alpha** by the human decision recorded in [ADR-009](adr/009-frame-native-canvas.md). They are a v0.2 headline candidate, to be decided from alpha-user feedback at the item-10 review checkpoint. What ships in v0.1: frame-native architecture (versions are frames; selection model; chat/editing target the selected frame), wrapping flow layout, zoom/fit, live-iframe budget.
 
+12. **Canvas v2 scope (explicitly out of 2b, human decision).** Shipped in 2b: infinite pan/zoom surface, drag-arrange, manifest-persisted positions, live-iframe budget (≤3), variation split. Explicitly deferred: **minimap, sections/grouping, comments, multiplayer, vector editing** — candidates ranked by alpha feedback, not built speculatively. Also parked: drag animation polish beyond direct placement (the 2b timebox rule — arrange shipped without animation; revisit if users notice).
+
 ## Raised during M0 — all resolved at M0 review (2026-07-06)
 
 8. **How legitimate artifact `<script>`s will run post-M0.** ~~Open~~ **Resolved:** keep stripping scripts during streaming; on commit of a complete, *validated* artifact, render it in the sandboxed iframe (opaque origin, no `allow-same-origin`) with scripts enabled. Re-assert the hostile fixture against the scripts-enabled commit path — it currently passes partly because scripts are removed rather than contained. Scheduled inside M1 item 6 (Validator), not as a hotfix. Recorded in ADR-002 addendum.

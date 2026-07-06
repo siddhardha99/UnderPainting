@@ -244,6 +244,38 @@ export class CanvasPanel {
               .then(() => this.postFrames(post, null))
               .catch((err) => deps.logger.error(`restore failed: ${formatError(err)}`));
             break;
+          case 'moveFrame':
+            // Drag-arrange (2b): manifest-only position write — local, free.
+            // No frames re-broadcast: the webview already shows the new spot.
+            void this.store
+              ?.setPosition(message.id, { x: message.x, y: message.y })
+              .catch((err) => deps.logger.error(`position save failed: ${formatError(err)}`));
+            break;
+          case 'splitFrame':
+            // Variation split (2b): each labeled variation becomes a sibling
+            // version — local file writes, free (P4), original untouched.
+            void (async () => {
+              if (!this.store) return;
+              const { versions } = await this.store.listVersions();
+              const source = versions.find((v) => v.id === message.frameId);
+              let lastId: string | null = null;
+              for (const variation of message.variations) {
+                const issues = validateArtifact(variation.html).map((i) => `[${i.rule}] ${i.message}`);
+                const meta = await this.store.commitVersion({
+                  html: variation.html,
+                  prompt: `Variation ${variation.label} (split from: ${source?.prompt ?? message.frameId})`,
+                  model: 'split',
+                  costUsd: 0,
+                  promptTokens: null,
+                  completionTokens: null,
+                  validated: issues.length === 0,
+                  issues,
+                });
+                lastId = meta.id;
+              }
+              await this.postFrames(post, lastId);
+            })().catch((err) => deps.logger.error(`variation split failed: ${formatError(err)}`));
+            break;
         }
       },
       undefined,
@@ -289,5 +321,6 @@ function toFrameMeta(v: VersionMeta, currentId: string | null): FrameMeta {
     prompt: v.prompt,
     isCurrent: v.id === currentId,
     validated: v.validated ?? true,
+    position: v.position ?? null,
   };
 }

@@ -10,6 +10,16 @@ import { committedSrcdoc, needsScriptRender } from './commitRender';
 import { fieldsToAsk, normalizeAnswers } from '../../shared/clarify';
 import type { Clarifications } from '../../shared/messages';
 import {
+  defaultPosition,
+  fitFrame,
+  pickLive,
+  visibleRect,
+  zoomAt,
+  ZOOM_MAX,
+  ZOOM_MIN,
+} from './boardGeometry';
+import { findVariationLabels, splitVariations } from './splitVariations';
+import {
   applyFrames,
   endPending,
   initialState,
@@ -49,8 +59,6 @@ const modeRefineButton = document.getElementById('mode-refine') as HTMLButtonEle
 
 const DEFAULT_LOGICAL_WIDTH = 1280;
 const LOGICAL_HEIGHT = 1400;
-const ZOOM_MIN = 0.15;
-const ZOOM_MAX = 1.5;
 const ZOOM_STEP = 0.05;
 
 interface FrameCard {
@@ -61,12 +69,16 @@ interface FrameCard {
   subtitle: HTMLSpanElement;
   badge: HTMLSpanElement;
   restoreButton: HTMLButtonElement;
+  splitButton: HTMLButtonElement;
+  header: HTMLDivElement;
   iframe: HTMLIFrameElement | null;
   iframeLoaded: boolean;
   /** Latest artifact HTML for this frame; flushed to the iframe once it loads. */
   html: string | null;
   logicalWidth: number;
-  onScreen: boolean;
+  /** Surface-space position (2b) — from the manifest, or the default grid slot. */
+  x: number;
+  y: number;
 }
 
 /** The in-flight (or just-finished-unsaved) exchange, drawn after committed history. */
@@ -78,7 +90,11 @@ interface EphemeralExchange {
 
 let state: BoardState = initialState();
 const cards = new Map<string, FrameCard>();
+const surface = document.getElementById('surface') as HTMLDivElement;
+/** Infinite-canvas view state (2b): surface transform = translate(pan) scale(zoom). */
 let zoom = 0.4;
+let panX = 24;
+let panY = 24;
 let mode: 'new' | 'refine' = 'new';
 let ephemeral: EphemeralExchange | null = null;
 /** Active direct-edit session (M1 item 4) — entirely local until Done saves one snapshot. */
@@ -152,7 +168,7 @@ function renderChat(): void {
     result.append(cost, meta);
     result.addEventListener('click', () => {
       selectFrameById(frame.id);
-      cards.get(frame.id)?.root.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      centerFrame(frame.id);
     });
     chatLog.appendChild(result);
   }
@@ -178,18 +194,6 @@ function renderChat(): void {
 
 // ---------------------------------------------------------------- frames DOM
 
-const visibility = new IntersectionObserver(
-  (entries) => {
-    for (const entry of entries) {
-      const card = [...cards.values()].find((c) => c.root === entry.target);
-      if (!card) continue;
-      card.onScreen = entry.isIntersecting;
-      syncLiveness(card);
-    }
-  },
-  { root: board, rootMargin: '128px' },
-);
-
 function createCard(id: string): FrameCard {
   const root = (frameTemplate.content.cloneNode(true) as DocumentFragment)
     .firstElementChild as HTMLDivElement;
@@ -201,23 +205,40 @@ function createCard(id: string): FrameCard {
     subtitle: root.querySelector('.frame-subtitle') as HTMLSpanElement,
     badge: root.querySelector('.current-badge') as HTMLSpanElement,
     restoreButton: root.querySelector('.restore') as HTMLButtonElement,
+    splitButton: root.querySelector('.split') as HTMLButtonElement,
+    header: root.querySelector('.frame-header') as HTMLDivElement,
     iframe: root.querySelector('iframe'),
     iframeLoaded: false,
     html: null,
     logicalWidth: DEFAULT_LOGICAL_WIDTH,
-    onScreen: false,
+    x: 0,
+    y: 0,
   };
   wireIframe(card);
-  card.root.addEventListener('click', () => selectFrameById(card.id));
+  card.root.addEventListener('click', () => {
+    if (suppressNextClick) return;
+    selectFrameById(card.id);
+  });
   card.restoreButton.addEventListener('click', (event) => {
     event.stopPropagation();
     send({ type: 'restore', id: card.id }); // local file op on the host — free (P4)
   });
+  card.splitButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    requestSplit(card);
+  });
+  wireFrameDrag(card);
   applyCardSize(card);
-  board.appendChild(root);
-  visibility.observe(root);
+  surface.appendChild(root);
   cards.set(id, card);
   return card;
+}
+
+function placeCard(card: FrameCard, x: number, y: number): void {
+  card.x = x;
+  card.y = y;
+  card.root.style.left = `${x}px`;
+  card.root.style.top = `${y}px`;
 }
 
 function wireIframe(card: FrameCard): void {
@@ -259,12 +280,37 @@ function setFrameHtml(card: FrameCard, html: string): void {
 }
 
 /**
- * Live-iframe budget (ADR-009): live = selected or on screen. Dropping to a
- * placeholder discards the iframe; coming back clones a fresh one from the
- * template and re-requests the snapshot from the host.
+ * Live-iframe budget (ADR-009/2b): pickLive ranks the selected frame first,
+ * then visible frames by distance to the viewport center, hard-capped —
+ * twenty frames on the board never means more than LIVE_CAP live iframes.
  */
-function syncLiveness(card: FrameCard): void {
-  const shouldBeLive = card.onScreen || state.selectedId === card.id || card.id === PENDING_ID;
+function updateLiveness(): void {
+  const view = visibleRect(panX, panY, zoom, board.clientWidth, board.clientHeight);
+  const boxes = [...cards.values()].map((c) => ({
+    id: c.id,
+    x: c.x,
+    y: c.y,
+    width: c.logicalWidth,
+    height: LOGICAL_HEIGHT,
+  }));
+  const live = pickLive(boxes, state.selectedId, view);
+  if (state.pendingId) live.add(PENDING_ID); // the streaming frame is always live
+  for (const card of cards.values()) {
+    syncLiveness(card, live.has(card.id));
+  }
+}
+
+let livenessQueued = false;
+function queueLiveness(): void {
+  if (livenessQueued) return;
+  livenessQueued = true;
+  requestAnimationFrame(() => {
+    livenessQueued = false;
+    updateLiveness();
+  });
+}
+
+function syncLiveness(card: FrameCard, shouldBeLive: boolean): void {
   if (shouldBeLive && !card.iframe) {
     card.clip.querySelector('.frame-placeholder')?.remove();
     const templateIframe = frameTemplate.content.querySelector('iframe') as HTMLIFrameElement;
@@ -289,12 +335,13 @@ function syncLiveness(card: FrameCard): void {
 }
 
 function applyCardSize(card: FrameCard): void {
-  card.clip.style.width = `${Math.round(card.logicalWidth * zoom)}px`;
-  card.clip.style.height = `${Math.round(LOGICAL_HEIGHT * zoom)}px`;
+  // Cards live at LOGICAL size on the surface; the surface transform does
+  // all scaling (2b) — no per-iframe transforms, one composited layer.
+  card.clip.style.width = `${card.logicalWidth}px`;
+  card.clip.style.height = `${LOGICAL_HEIGHT}px`;
   if (card.iframe) {
     card.iframe.style.width = `${card.logicalWidth}px`;
     card.iframe.style.height = `${LOGICAL_HEIGHT}px`;
-    card.iframe.style.transform = `scale(${zoom})`;
   }
 }
 
@@ -302,24 +349,52 @@ function render(): void {
   // Drop cards whose frames disappeared (restore never deletes, but stay defensive).
   for (const [id, card] of cards) {
     if (id !== PENDING_ID && !state.frames.some((f) => f.id === id)) {
-      visibility.unobserve(card.root);
       card.root.remove();
       cards.delete(id);
     }
   }
-  for (const frame of state.frames) {
+  state.frames.forEach((frame, index) => {
     const card = cards.get(frame.id) ?? createCard(frame.id);
     card.title.textContent = (frame.validated ? '' : '⚠ ') + frame.title;
     card.subtitle.textContent = frame.subtitle;
     card.badge.hidden = !frame.isCurrent;
     card.restoreButton.hidden = frame.isCurrent;
+    const position = frame.position ?? defaultPosition(index, DEFAULT_LOGICAL_WIDTH, LOGICAL_HEIGHT);
+    if (!dragState || dragState.card.id !== frame.id) {
+      placeCard(card, position.x, position.y);
+    }
+    card.splitButton.hidden =
+      card.html === null || findVariationLabels(card.html, sharedParser).length < 2;
+  });
+  const pendingCard = cards.get(PENDING_ID);
+  if (pendingCard && state.pendingId) {
+    const slot = defaultPosition(state.frames.length, DEFAULT_LOGICAL_WIDTH, LOGICAL_HEIGHT);
+    placeCard(pendingCard, slot.x, slot.y);
   }
   for (const card of cards.values()) {
     card.root.classList.toggle('selected', state.selectedId === card.id);
-    syncLiveness(card);
   }
+  updateLiveness();
   syncViewportButtons();
   renderChat();
+}
+
+const sharedParser = new DOMParser();
+
+/** Variation split (2b): marker-based, local, free — N new sibling versions. */
+function requestSplit(card: FrameCard): void {
+  if (card.html === null) return;
+  const parts = splitVariations(card.html, sharedParser);
+  if (!parts) {
+    setStatus('This frame has no splittable data-variation sections.', true);
+    return;
+  }
+  send({
+    type: 'splitFrame',
+    frameId: card.id,
+    variations: parts.map((p) => ({ label: p.label, html: p.html })),
+  });
+  setStatus(`Splitting ${parts.length} variations into separate frames — local, free.`);
 }
 
 function adoptPending(newId: string, meta: FrameMeta | undefined): void {
@@ -401,22 +476,167 @@ function handleTextEdit(card: FrameCard, edit: { path: number[]; before: string;
   );
 }
 
-// ------------------------------------------------------------------ zoom/fit
+// -------------------------------------------- infinite canvas: pan/zoom (2b)
 
-function setZoom(next: number): void {
-  zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+function applyView(): void {
+  surface.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   zoomLevel.textContent = `${Math.round(zoom * 100)}%`;
-  for (const card of cards.values()) {
-    applyCardSize(card);
-  }
+  queueLiveness();
 }
 
-document.getElementById('zoom-in')!.addEventListener('click', () => setZoom(zoom + ZOOM_STEP));
-document.getElementById('zoom-out')!.addEventListener('click', () => setZoom(zoom - ZOOM_STEP));
+function setView(next: { panX: number; panY: number; zoom: number }): void {
+  panX = next.panX;
+  panY = next.panY;
+  zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next.zoom));
+  applyView();
+}
+
+/** Zoom keeping the viewport center fixed (buttons); wheel zoom anchors at the cursor. */
+function zoomStep(delta: number, anchorX = board.clientWidth / 2, anchorY = board.clientHeight / 2): void {
+  setView(zoomAt(panX, panY, zoom, zoom + delta, anchorX, anchorY));
+}
+
+/** Pan so `card` is centered at the current zoom. */
+function centerFrame(id: string): void {
+  const card = cards.get(id);
+  if (!card) return;
+  setView({
+    panX: board.clientWidth / 2 - (card.x + card.logicalWidth / 2) * zoom,
+    panY: board.clientHeight / 2 - (card.y + LOGICAL_HEIGHT / 2) * zoom,
+    zoom,
+  });
+}
+
+document.getElementById('zoom-in')!.addEventListener('click', () => zoomStep(ZOOM_STEP * 2));
+document.getElementById('zoom-out')!.addEventListener('click', () => zoomStep(-ZOOM_STEP * 2));
+document.getElementById('zoom-100')!.addEventListener('click', () => {
+  setView(zoomAt(panX, panY, zoom, 1, board.clientWidth / 2, board.clientHeight / 2));
+});
 document.getElementById('zoom-fit')!.addEventListener('click', () => {
-  const selected = state.selectedId ? cards.get(state.selectedId) : undefined;
-  const logicalWidth = selected?.logicalWidth ?? DEFAULT_LOGICAL_WIDTH;
-  setZoom((board.clientWidth - 48) / logicalWidth);
+  const target =
+    (state.selectedId && cards.get(state.selectedId)) || [...cards.values()][0];
+  if (!target) return;
+  setView(
+    fitFrame(
+      { x: target.x, y: target.y, width: target.logicalWidth, height: LOGICAL_HEIGHT },
+      board.clientWidth,
+      board.clientHeight,
+    ),
+  );
+});
+
+// Wheel: plain scroll pans; ctrl/cmd-scroll zooms toward the cursor. Local, free.
+board.addEventListener(
+  'wheel',
+  (event) => {
+    event.preventDefault();
+    const bounds = board.getBoundingClientRect();
+    if (event.ctrlKey || event.metaKey) {
+      const factor = Math.exp(-event.deltaY * 0.0015);
+      setView(
+        zoomAt(panX, panY, zoom, zoom * factor, event.clientX - bounds.left, event.clientY - bounds.top),
+      );
+    } else {
+      setView({ panX: panX - event.deltaX, panY: panY - event.deltaY, zoom });
+    }
+  },
+  { passive: false },
+);
+
+// Space-drag pans; dragging a frame header moves the frame (persisted on drop).
+let spaceHeld = false;
+let panDrag: { startX: number; startY: number; panX: number; panY: number } | null = null;
+let dragState: {
+  card: FrameCard;
+  startX: number;
+  startY: number;
+  originX: number;
+  originY: number;
+  moved: boolean;
+} | null = null;
+let suppressNextClick = false;
+
+window.addEventListener('keydown', (event) => {
+  if (event.code === 'Space' && !isTypingTarget(event.target)) {
+    spaceHeld = true;
+    board.classList.add('pan-ready');
+    if (!present) event.preventDefault();
+  }
+});
+window.addEventListener('keyup', (event) => {
+  if (event.code === 'Space') {
+    spaceHeld = false;
+    board.classList.remove('pan-ready');
+  }
+});
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  );
+}
+
+board.addEventListener('mousedown', (event) => {
+  if (!spaceHeld) return;
+  event.preventDefault();
+  panDrag = { startX: event.clientX, startY: event.clientY, panX, panY };
+  board.classList.add('panning');
+});
+
+function wireFrameDrag(card: FrameCard): void {
+  card.header.addEventListener('mousedown', (event) => {
+    if (spaceHeld || (event.target as HTMLElement).tagName === 'BUTTON') return;
+    event.preventDefault();
+    dragState = {
+      card,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: card.x,
+      originY: card.y,
+      moved: false,
+    };
+  });
+}
+
+window.addEventListener('mousemove', (event) => {
+  if (panDrag) {
+    setView({
+      panX: panDrag.panX + (event.clientX - panDrag.startX),
+      panY: panDrag.panY + (event.clientY - panDrag.startY),
+      zoom,
+    });
+    return;
+  }
+  if (dragState) {
+    const dx = (event.clientX - dragState.startX) / zoom;
+    const dy = (event.clientY - dragState.startY) / zoom;
+    if (Math.abs(dx) + Math.abs(dy) > 3) dragState.moved = true;
+    placeCard(dragState.card, dragState.originX + dx, dragState.originY + dy);
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  if (panDrag) {
+    panDrag = null;
+    board.classList.remove('panning');
+  }
+  if (dragState) {
+    if (dragState.moved && dragState.card.id !== PENDING_ID) {
+      // Persist to the project manifest — git-diffable, free (P4/P5).
+      send({
+        type: 'moveFrame',
+        id: dragState.card.id,
+        x: Math.round(dragState.card.x),
+        y: Math.round(dragState.card.y),
+      });
+      queueLiveness();
+      suppressNextClick = true;
+      setTimeout(() => (suppressNextClick = false), 0);
+    }
+    dragState = null;
+  }
 });
 
 // ------------------------------------------------- viewport width (selected)
@@ -530,7 +750,7 @@ window.addEventListener('message', (event: MessageEvent) => {
       card.html = '';
       if (card.iframe && card.iframeLoaded) postToFrame(card, { type: 'reset' });
       render();
-      card.root.scrollIntoView({ block: 'nearest' });
+      centerFrame(PENDING_ID);
       break;
     }
     case 'streamChunk': {
@@ -597,7 +817,6 @@ window.addEventListener('message', (event: MessageEvent) => {
       setStatus(message.message, true);
       const card = cards.get(PENDING_ID);
       if (card && !card.html) {
-        visibility.unobserve(card.root);
         card.root.remove();
         cards.delete(PENDING_ID);
       }
@@ -849,5 +1068,5 @@ promptInput.addEventListener('keydown', (event) => {
 });
 
 setMode('new');
-setZoom(zoom);
+applyView();
 send({ type: 'ready' });

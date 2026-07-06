@@ -66,7 +66,9 @@ export function foldClarifications(prompt: string, answers: ClarifyAnswers): str
   if (answers.colors?.trim()) lines.push(`Brand colors: ${answers.colors.trim()}`);
   if (answers.variations && answers.variations > 1) {
     lines.push(
-      `Variations: produce ${answers.variations} distinct labeled variations side by side in this one document`,
+      `Variations: produce ${answers.variations} distinct variations side by side in this one document. ` +
+        `Wrap each variation's entire markup in its own top-level <section data-variation="A"> (then "B", "C"…) ` +
+        `with a visible label — the canvas can then split them into separate frames.`,
     );
   }
   if (answers.constraints?.trim()) lines.push(`Constraints: ${answers.constraints.trim()}`);

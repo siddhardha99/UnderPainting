@@ -37,6 +37,8 @@ export const versionMetaSchema = z
     issues: z.array(z.string()).optional(),
     /** Clarify-form answers (v0.2 item 1) — recorded for reproducibility. */
     clarifications: clarificationsSchema.optional(),
+    /** Board position (v0.2 item 2b): the manifest's only per-version mutable field; snapshots stay immutable. */
+    position: z.object({ x: z.number(), y: z.number() }).strict().optional(),
   })
   .strict();
 export type VersionMeta = z.infer<typeof versionMetaSchema>;
@@ -179,5 +181,17 @@ export class DocumentStore {
       throw new Error(`Unknown version id: ${id}`);
     }
     await this.writeManifest({ ...manifest, current: id });
+  }
+
+  /** Persist a frame's board position (2b): manifest-only, git-diffable (P5); snapshots untouched. */
+  async setPosition(id: string, position: { x: number; y: number }): Promise<void> {
+    const manifest = await this.readManifest();
+    if (!manifest.versions.some((v) => v.id === id)) {
+      throw new Error(`Unknown version id: ${id}`);
+    }
+    await this.writeManifest({
+      ...manifest,
+      versions: manifest.versions.map((v) => (v.id === id ? { ...v, position } : v)),
+    });
   }
 }

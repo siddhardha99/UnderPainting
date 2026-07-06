@@ -82,3 +82,17 @@ describe('present mode (v0.2 item 2a)', () => {
     expect(html.match(/<iframe/g)!.length).toBe(1);
   });
 });
+
+describe('infinite canvas (v0.2 item 2b)', () => {
+  it('ships the viewport/surface pair and the 100% zoom control', () => {
+    expect(html).toContain('<div id="surface"');
+    expect(html).toContain('id="zoom-100"');
+    expect(html).toContain('pan with space-drag');
+  });
+
+  it('ships the split button in the frame template, hidden by default', () => {
+    const template = html.match(/<template id="frame-template"[\s\S]*?<\/template>/)![0];
+    expect(template).toContain('class="split"');
+    expect(template).toMatch(/class="split" hidden/);
+  });
+});

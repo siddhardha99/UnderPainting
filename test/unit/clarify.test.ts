@@ -44,7 +44,8 @@ describe('foldClarifications — answers become an authoritative addendum', () =
     expect(folded.startsWith('a card\n\nClarifications from the user (authoritative):')).toBe(true);
     expect(folded).toContain('- Artifact type: component');
     expect(folded).toContain('- Style direction: minimal, calm');
-    expect(folded).toContain('2 distinct labeled variations');
+    expect(folded).toContain('2 distinct variations');
+    expect(folded).toContain('data-variation="A"');
     expect(folded).not.toContain('Brand colors');
   });
 
