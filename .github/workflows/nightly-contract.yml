@@ -1,0 +1,37 @@
+# Nightly contract tests against the live OpenRouter API (brief §12 item 5).
+# An API-drift tripwire: catalog shape, usage-accounting fields, SSE framing.
+#
+# Secret: OPENROUTER_CONTRACT_KEY — a dedicated, low-credit OpenRouter key
+# added by a maintainer (Settings → Secrets and variables → Actions). The
+# suite skips cleanly when the secret is absent, so forks stay green.
+# One nightly run costs a fraction of a cent (a single tiny completion on
+# the cheapest available model).
+name: Nightly contract tests
+
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install (lockfile-pinned, no lifecycle scripts)
+        run: npm ci --ignore-scripts
+
+      - name: OpenRouter API contract tests
+        env:
+          OPENROUTER_CONTRACT_KEY: ${{ secrets.OPENROUTER_CONTRACT_KEY }}
+        run: |
+          if [ -z "$OPENROUTER_CONTRACT_KEY" ]; then
+            echo "::notice::OPENROUTER_CONTRACT_KEY not set — contract tests skipped."
+          fi
+          npm run test:contract
