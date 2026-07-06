@@ -6,6 +6,7 @@ import {
   PENDING_ID,
   select,
   startPending,
+  stepFrame,
 } from '../../src/webview/canvas/frameState';
 import type { FrameMeta } from '../../src/shared/messages';
 
@@ -66,5 +67,18 @@ describe('frame board state (ADR-009)', () => {
     state = endPending(state);
     expect(state.pendingId).toBeNull();
     expect(state.frames).toHaveLength(1);
+  });
+});
+
+describe('present-mode stepping (v0.2 item 2a)', () => {
+  const three = [frame('a'), frame('b', true), frame('c')];
+  it('steps through versions in manifest order, clamped at the ends', () => {
+    expect(stepFrame(three, 'b', 1)).toBe('c');
+    expect(stepFrame(three, 'b', -1)).toBe('a');
+    expect(stepFrame(three, 'c', 1)).toBe('c'); // clamp, no wrap
+    expect(stepFrame(three, 'a', -1)).toBe('a');
+  });
+  it('unknown ids are a no-op', () => {
+    expect(stepFrame(three, 'nope', 1)).toBe('nope');
   });
 });

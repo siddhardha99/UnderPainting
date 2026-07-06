@@ -62,3 +62,23 @@ describe('canvas chrome', () => {
     expect(html.match(/<iframe/g)!.length).toBe(1); // only the template's
   });
 });
+
+describe('present mode (v0.2 item 2a)', () => {
+  it('ships the overlay, hidden by default, with position + hint chrome', () => {
+    expect(html).toContain('<div id="present-overlay" hidden>');
+    for (const id of ['present-bar', 'present-title', 'present-pos', 'present-stage', 'present-close']) {
+      expect(html).toContain(`id="${id}"`);
+    }
+  });
+
+  it('labels present as local and free with the keyboard affordances (P4)', () => {
+    const button = html.match(/<button id="present-button"[^>]*>/)![0];
+    expect(button).toContain('free');
+    expect(button).toContain('Esc');
+    expect(html).toContain('←/→ versions');
+  });
+
+  it('adds no iframe outside the template (the present iframe clones at runtime)', () => {
+    expect(html.match(/<iframe/g)!.length).toBe(1);
+  });
+});

@@ -16,6 +16,7 @@ import {
   PENDING_ID,
   select,
   startPending,
+  stepFrame,
   type BoardState,
 } from './frameState';
 
@@ -87,6 +88,10 @@ const editButton = document.getElementById('edit-text') as HTMLButtonElement;
 let pendingClarifyPrompt: string | null = null;
 let groundingTokensPresent = false;
 const clarifyPanel = document.getElementById('clarify') as HTMLDivElement;
+/** Present mode (v0.2 item 2a): full-screen, interactive, local & free. */
+let present: { frameId: string; iframe: HTMLIFrameElement; loaded: boolean; html: string | null } | null = null;
+const presentOverlay = document.getElementById('present-overlay') as HTMLDivElement;
+const presentStage = document.getElementById('present-stage') as HTMLDivElement;
 
 function send(message: WebviewToHost): void {
   vscode.postMessage(webviewToHostSchema.parse(message));
@@ -549,6 +554,9 @@ window.addEventListener('message', (event: MessageEvent) => {
     case 'frameContent': {
       const card = cards.get(message.id);
       if (card) setFrameHtml(card, message.html);
+      if (present && present.frameId === message.id) {
+        setPresentHtml(message.html);
+      }
       break;
     }
     case 'streamDone': {
@@ -602,6 +610,112 @@ window.addEventListener('message', (event: MessageEvent) => {
       renderChat();
       break;
     }
+  }
+});
+
+// ----------------------------------------------------- present mode (free)
+
+/**
+ * Present mode (v0.2 item 2a): the selected frame full-screen at natural
+ * scale, interactivity on by default (the iframe receives all pointer
+ * events; the sandbox still contains everything). Esc exits, ←/→ steps
+ * through versions in manifest order. Entirely local and free (P4).
+ */
+function openPresent(frameId: string): void {
+  if (editSession) finishEditSession();
+  closePresent();
+  const templateIframe = frameTemplate.content.querySelector('iframe') as HTMLIFrameElement;
+  const iframe = templateIframe.cloneNode(true) as HTMLIFrameElement;
+  present = { frameId, iframe, loaded: false, html: null };
+  iframe.addEventListener('load', () => {
+    if (!present || present.iframe !== iframe) return;
+    present.loaded = true;
+    if (present.html !== null) {
+      iframe.contentWindow?.postMessage({ type: 'patch', html: present.html }, '*');
+    }
+  });
+  presentStage.appendChild(iframe);
+  presentOverlay.hidden = false;
+  loadPresentContent(frameId);
+}
+
+function closePresent(): void {
+  if (!present) return;
+  present.iframe.remove();
+  present = null;
+  presentOverlay.hidden = true;
+}
+
+function loadPresentContent(frameId: string): void {
+  if (!present) return;
+  present.frameId = frameId;
+  const meta = state.frames.find((f) => f.id === frameId);
+  const index = state.frames.findIndex((f) => f.id === frameId);
+  (document.getElementById('present-title') as HTMLSpanElement).textContent = meta?.title ?? '';
+  (document.getElementById('present-pos') as HTMLSpanElement).textContent =
+    index >= 0 ? `version ${index + 1} of ${state.frames.length}` : '';
+  const cached = cards.get(frameId)?.html ?? null;
+  if (cached !== null) {
+    setPresentHtml(cached);
+  } else {
+    present.html = null;
+    send({ type: 'requestFrame', id: frameId });
+  }
+  // Keep board selection in sync so refine/edit target what was presented.
+  state = select(state, frameId);
+  send({ type: 'selectFrame', id: frameId });
+}
+
+function setPresentHtml(html: string): void {
+  if (!present) return;
+  const meta = state.frames.find((f) => f.id === present!.frameId);
+  // Same ADR-002 gate as board frames: validated script-bearing artifacts
+  // render as their own document; everything else morphs sanitized.
+  if (meta?.validated && needsScriptRender(html)) {
+    present.html = html;
+    present.loaded = false;
+    present.iframe.srcdoc = committedSrcdoc(html, frameTemplate.dataset['nonce'] ?? '');
+    return;
+  }
+  present.html = html;
+  if (present.loaded) {
+    present.iframe.contentWindow?.postMessage({ type: 'patch', html }, '*');
+  }
+}
+
+function stepPresent(direction: -1 | 1): void {
+  if (!present) return;
+  const next = stepFrame(state.frames, present.frameId, direction);
+  if (next !== present.frameId) {
+    present.iframe.contentWindow?.postMessage({ type: 'reset' }, '*');
+    loadPresentContent(next);
+  }
+}
+
+document.getElementById('present-button')!.addEventListener('click', () => {
+  const target =
+    state.selectedId && state.selectedId !== PENDING_ID && state.frames.some((f) => f.id === state.selectedId)
+      ? state.selectedId
+      : (state.currentId ?? state.frames.at(-1)?.id);
+  if (!target) {
+    setStatus('Nothing to present yet — generate a design first.');
+    return;
+  }
+  openPresent(target);
+});
+document.getElementById('present-close')!.addEventListener('click', closePresent);
+window.addEventListener('keydown', (event) => {
+  if (!present) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closePresent();
+    render();
+  } else if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    stepPresent(-1);
+  } else if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    stepPresent(1);
   }
 });
 
