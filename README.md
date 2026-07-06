@@ -9,6 +9,14 @@
 - 💸 **Radically cost-transparent.** Every request shows its actual dollar cost, read from OpenRouter's own accounting — never estimated.
 - 🆓 **Free forever.** The client is Apache-2.0 with no license gates and no feature clawbacks — ever.
 
+## How this differs from hosted AI design tools
+
+Three structural differences — properties of the architecture, not feature-list items:
+
+1. **Exactly one auditable network destination.** Everything leaves your machine to `openrouter.ai` or not at all — verifiable in [PRIVACY.md](PRIVACY.md) (the complete endpoint list fits on one screen) and enforced by CI tests that fail if any other module gains network access.
+2. **Bring your own key, any model.** You pay OpenRouter's price with your own key and pick from its live catalog — no markup, no bundled "credits", no model lock-in.
+3. **Exact cost, from the provider's own accounting.** Every request shows the dollar amount OpenRouter actually recorded for it — read from the API, never estimated.
+
 ## Status: pre-alpha (Milestone 0 — walking skeleton)
 
 What works today:
