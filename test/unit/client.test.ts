@@ -173,6 +173,74 @@ describe('OpenRouterClient.getCredits', () => {
   });
 });
 
+describe('OpenRouterClient.getModels', () => {
+  const catalogBody = {
+    data: [
+      {
+        id: 'anthropic/claude-sonnet-4.6',
+        name: 'Claude Sonnet 4.6',
+        context_length: 200000,
+        pricing: { prompt: '0.000003', completion: '0.000015' },
+      },
+      { id: 'some/free-model', pricing: { prompt: '0', completion: '0' } },
+      { id: 'odd/no-pricing' },
+    ],
+  };
+
+  it('maps the catalog, parsing string prices to numbers', async () => {
+    const client = new OpenRouterClient({
+      fetchFn: async () => new Response(JSON.stringify(catalogBody), { status: 200 }),
+    });
+    const models = await client.getModels();
+    expect(models).toHaveLength(3);
+    expect(models[0]).toEqual({
+      id: 'anthropic/claude-sonnet-4.6',
+      name: 'Claude Sonnet 4.6',
+      contextLength: 200000,
+      promptPricePerToken: 0.000003,
+      completionPricePerToken: 0.000015,
+    });
+    expect(models[1]!.promptPricePerToken).toBe(0);
+    expect(models[2]!.promptPricePerToken).toBeNull();
+  });
+
+  it('sends the key when provided and hits only the allowlisted URL', async () => {
+    let captured: { url: string; init: RequestInit } | undefined;
+    const client = new OpenRouterClient({
+      fetchFn: async (url, init) => {
+        captured = { url: String(url), init: init! };
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      },
+    });
+    await client.getModels(KEY);
+    expect(captured!.url).toBe('https://openrouter.ai/api/v1/models');
+    expect((captured!.init.headers as Record<string, string>).authorization).toBe(`Bearer ${KEY}`);
+  });
+});
+
+describe('OpenRouterClient.streamChat maxTokens', () => {
+  it('forwards maxTokens as max_tokens and omits it by default', async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const client = new OpenRouterClient({
+      fetchFn: async (_url, init) => {
+        bodies.push(JSON.parse(String(init!.body)));
+        return sseResponse(['data: [DONE]\n\n']);
+      },
+    });
+    const base = {
+      apiKey: KEY,
+      model: 'test/model',
+      system: 's',
+      user: 'u',
+      signal: new AbortController().signal,
+    };
+    await client.streamChat(base);
+    await client.streamChat({ ...base, maxTokens: 16 });
+    expect('max_tokens' in bodies[0]!).toBe(false);
+    expect(bodies[1]!['max_tokens']).toBe(16);
+  });
+});
+
 describe('OpenRouterClient.getGenerationCost', () => {
   it('reads the exact recorded cost', async () => {
     const client = new OpenRouterClient({

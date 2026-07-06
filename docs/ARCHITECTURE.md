@@ -7,8 +7,10 @@ Extension Host (Node)
 ├─ KeyVault             src/host/keyvault/    SecretStorage only (P2)
 ├─ OpenRouterClient     src/host/client/      THE ONLY MODULE THAT FETCHES (P1)
 │     hostname allowlist · SSE streaming · AbortController (≤1s cancel)
-│     usage/cost readers (stream usage + /generation fallback)
-├─ Orchestrator         src/host/orchestrator/ M0: prompt → stream → cost
+│     usage/cost readers (stream usage + /generation fallback) · /models catalog
+├─ Model catalog        src/host/models/      pure helpers: pricing display,
+│     deprecation → suggested-equivalent ranking (never a silent switch)
+├─ Orchestrator         src/host/orchestrator/ prompt → stream → cost
 ├─ writeScope guard     src/host/store/       all fs writes confined to .design/ (P5/P9)
 ├─ SecretRedactor       src/host/logging/     every outbound string is scrubbed
 └─ CanvasPanel          src/host/canvas/      webview lifecycle, validated poster
@@ -34,7 +36,11 @@ Canvas Webview (sandboxed)                    src/webview/canvas/
 
 `Generate` click → `generate` message → Orchestrator streams from OpenRouter → each accumulated buffer passes `extractHtml` (fence/prose stripping) → `streamChunk` posts (throttled ~30ms) → canvas forwards to the artifact iframe → bootstrap parses with `DOMParser` and **morphs** the live DOM (index-based diff, `src/webview/artifact/morph.ts`) — no full reload, stable node identity, so completed content doesn't flicker while later content streams.
 
-Cost is read from OpenRouter's `usage` accounting on the final SSE frame (requested via `usage: {include: true}`); if absent, one follow-up `GET /api/v1/generation` reads the recorded cost. It is never estimated.
+Cost is read from OpenRouter's `usage` accounting on the final SSE frame (requested via `usage: {include: true}`); if absent, one follow-up `GET /api/v1/generation` reads the recorded cost (bounded: capped attempts, per-attempt timeout). It is never estimated.
+
+## Model selection (M1 item 1)
+
+There are **no hardcoded model IDs**. The generation and validation models are user settings (`underpainting.generationModel` / `underpainting.validationModel`), chosen from the **live catalog** (`GET /api/v1/models`) via the Select-Model commands, with per-million-token pricing displayed in the picker. The catalog is fetched only on those explicit user actions (P3). When OpenRouter rejects the configured model mid-generation (deprecated/renamed), the host fetches the catalog and offers ranked equivalents (`src/host/models/catalog.ts`) — a one-click switch the user confirms, never a silent substitution (§9). The validation model is consumed by the correction loop when the Validator lands (M1 item 6).
 
 ## Activation budget
 
@@ -52,4 +58,4 @@ The **design budget for activation is ≤500ms** with no work before the first c
 | P7 one-minute audit | PRIVACY-drift check inside `allowlist.test.ts` |
 | §4 dependency budget | `test/invariants/dep-budget.test.ts` |
 
-Not yet built (M1+): DocumentStore, DesignSystemExtractor, Validator, CostLedger, chat panel, model catalog. See BUILD_BRIEF.md §11.
+Not yet built (M1 items 2+): DocumentStore, chat panel, direct editing, DesignSystemExtractor, Validator, scaffolds copy-in, CostLedger, export/handoff, eval harness runner. See BUILD_BRIEF.md §11.

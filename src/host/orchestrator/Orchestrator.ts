@@ -1,17 +1,16 @@
 import type { HostToWebview } from '../../shared/messages';
 import type { KeyVault } from '../keyvault/KeyVault';
-import type { OpenRouterClient } from '../client/OpenRouterClient';
+import { HttpError, type OpenRouterClient } from '../client/OpenRouterClient';
 import type { Logger } from '../logging/redact';
 import { formatError } from '../logging/redact';
 import { extractHtml } from './extractHtml';
 
 /**
- * M0 orchestrator: one generation at a time, prompt → stream → cost.
- * The model is hardcoded for the walking skeleton; the live model catalog
- * and per-task model settings are M1 item 1, and the shipped defaults are a
- * human decision (brief §14, docs/OPEN_QUESTIONS.md).
+ * One generation at a time: prompt → stream → cost. The model comes from
+ * the user's per-task settings (M1 item 1) — there are no hardcoded model
+ * IDs anywhere; shipped defaults remain a release-time human decision
+ * (brief §14).
  */
-export const M0_MODEL = 'anthropic/claude-sonnet-4.5';
 
 /** Bounded correction retries (§9). M0 has no validator yet, but the cap is part of the contract. */
 export const CORRECTION_RETRY_CAP = 2;
@@ -24,6 +23,14 @@ export interface OrchestratorDeps {
   keyVault: KeyVault;
   logger: Logger;
   loadCorePrompt: () => Promise<string>;
+  /** The user's configured generation model, or undefined when none is chosen yet. */
+  getGenerationModel: () => string | undefined;
+  /**
+   * Invoked when OpenRouter rejects the configured model (deprecated or
+   * renamed) so the host can offer a suggested-equivalent switch — always a
+   * user choice, never a silent substitution (§9).
+   */
+  onModelUnavailable?: (modelId: string) => void;
   /** Posts to the webview; the poster validates and redacts (see createHostPoster). */
   post: (message: HostToWebview) => void;
 }
@@ -63,6 +70,16 @@ export class Orchestrator {
       return;
     }
 
+    const model = this.deps.getGenerationModel();
+    if (!model) {
+      post({
+        type: 'streamError',
+        message:
+          'No generation model is selected. Run "Underpainting: Select Generation Model" to pick one from the live OpenRouter catalog.',
+      });
+      return;
+    }
+
     const system = await this.deps.loadCorePrompt();
     const controller = new AbortController();
     this.active = controller;
@@ -72,7 +89,7 @@ export class Orchestrator {
     try {
       const result = await client.streamChat({
         apiKey,
-        model: M0_MODEL,
+        model,
         system,
         user: userPrompt,
         signal: controller.signal,
@@ -102,7 +119,7 @@ export class Orchestrator {
       post({ type: 'streamDone', costUsd, promptTokens, completionTokens });
       logger.info(
         `this generation: ${costUsd !== null ? `$${costUsd.toFixed(4)}` : 'cost unavailable'}` +
-          ` — model ${M0_MODEL}` +
+          ` — model ${model}` +
           (promptTokens !== null && completionTokens !== null
             ? `, ${promptTokens} prompt + ${completionTokens} completion tokens`
             : ''),
@@ -111,6 +128,14 @@ export class Orchestrator {
       if (controller.signal.aborted) {
         post({ type: 'streamCancelled' });
         logger.info('generation cancelled by user; stream aborted');
+      } else if (isModelRejection(err)) {
+        const message =
+          `OpenRouter rejected the model "${model}" — it may be deprecated or renamed. ` +
+          `(${formatError(err)})`;
+        post({ type: 'streamError', message });
+        logger.error(message);
+        // Offer the one-click switch; the host shows suggestions, the user decides.
+        this.deps.onModelUnavailable?.(model);
       } else {
         const message = formatError(err);
         post({ type: 'streamError', message });
@@ -125,4 +150,17 @@ export class Orchestrator {
   cancel(): void {
     this.active?.abort();
   }
+}
+
+/**
+ * Heuristic for "the model itself was rejected": OpenRouter answers 400/404
+ * with an error body naming the model. Only ever used to *offer* a switch —
+ * a false positive costs the user one dismissible dialog, nothing more.
+ */
+function isModelRejection(err: unknown): boolean {
+  return (
+    err instanceof HttpError &&
+    (err.status === 400 || err.status === 404) &&
+    /model/i.test(err.message)
+  );
 }

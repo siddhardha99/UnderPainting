@@ -11,6 +11,7 @@ The extension talks to exactly one host: **`openrouter.ai`**, over HTTPS, using 
 | Generate a design | `POST /api/v1/chat/completions` | Only when you click **Generate** | Your prompt, the core prompt, your key |
 | Validate key / show credits | `GET /api/v1/credits` | Only when you set your key | Your key |
 | Look up a request's exact cost | `GET /api/v1/generation` | After a generation you started, if the stream didn't include usage | Your key, the generation id |
+| Browse the model catalog | `GET /api/v1/models` | Only when you open a model picker, or accept the switch dialog after OpenRouter rejects your model | Your key |
 
 That's the whole list. There are no background, scheduled, speculative, or warm-up requests — nothing happens on activation, on startup, or on a timer. Local edits never make network calls.
 
