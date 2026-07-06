@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "slug": "inkwell-pricing-commitments",
+  "added": "2026-07-06",
+  "origin": "Live item-5 run: an ungrounded generation added 'All plans include a 14-day trial. No card required to start.' — a policy commitment no prompt phrase licensed. Human decision at the item-5 review refined the A6 rule.",
+  "exercises": [
+    "A6 refinement — invented commitments: content invention licensed by the prompt (feature names under 'a short feature list') is compliant, but invented POLICY or CLAIMS (trials, guarantees, refund/cancellation terms, prices not in the prompt, legal-ish promises) is flagged even when content invention is licensed"
+  ],
+  "checks": [
+    {
+      "id": "a6-no-invented-commitments",
+      "kind": "deterministic",
+      "note": "flag policy/claim language not present in the prompt: trial offers and durations, 'no credit card', money-back/guarantee wording, cancellation/refund terms, invented prices or discounts, compliance or security certifications"
+    }
+  ]
+}

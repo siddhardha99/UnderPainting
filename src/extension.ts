@@ -30,6 +30,9 @@ interface Services {
   loadCorePrompt: () => Promise<string>;
   loadRefineRecipe: () => Promise<string>;
   loadGroundingPreamble: () => Promise<string>;
+  /** Catalog pricing captured when the user picked the model — display only, never refetched (P3). */
+  getModelPricing: (modelId: string) => string | undefined;
+  cacheModelPricing: (modelId: string, detail: string) => Promise<void>;
 }
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -51,6 +54,10 @@ export function activate(context: vscode.ExtensionContext): void {
           fs.readFile(path.join(context.extensionUri.fsPath, 'prompts', 'refine.md'), 'utf8'),
         loadGroundingPreamble: () =>
           fs.readFile(path.join(context.extensionUri.fsPath, 'prompts', 'grounding.md'), 'utf8'),
+        getModelPricing: (modelId) =>
+          context.globalState.get<string>(`underpainting.pricing.${modelId}`),
+        cacheModelPricing: (modelId, detail) =>
+          Promise.resolve(context.globalState.update(`underpainting.pricing.${modelId}`, detail)),
       };
     }
     return services;
@@ -61,6 +68,7 @@ export function activate(context: vscode.ExtensionContext): void {
       CanvasPanel.createOrShow(context, {
         ...getServices(),
         getGenerationModel: () => getConfiguredModel('generationModel'),
+        getModelPricing: (modelId) => getServices().getModelPricing(modelId),
         onModelUnavailable: (modelId) => void offerModelSwitch(getServices(), modelId),
       }),
     ),
@@ -179,6 +187,7 @@ async function selectModel(services: Services, setting: ModelSetting): Promise<v
   );
   if (!picked) return;
   await updateConfiguredModel(setting, picked.modelId);
+  await services.cacheModelPricing(picked.modelId, picked.detail);
   void vscode.window.showInformationMessage(
     `Underpainting: ${task} model set to ${picked.modelId} (${picked.detail}).`,
   );
@@ -227,6 +236,7 @@ async function offerModelSwitch(services: Services, missingId: string): Promise<
   );
   if (!picked) return;
   await updateConfiguredModel('generationModel', picked.modelId);
+  await services.cacheModelPricing(picked.modelId, picked.detail);
   void vscode.window.showInformationMessage(
     `Underpainting: generation model switched to ${picked.modelId}. Run Generate again.`,
   );

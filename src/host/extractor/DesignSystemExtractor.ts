@@ -204,9 +204,10 @@ function collectCssCustomProperties(
   tokens: Map<string, TokenEntry>,
 ): boolean {
   let contributed = false;
-  // Theme-level rules only: :root / html blocks (covers plain CSS and the
-  // common SCSS pattern). Tailwind v4 @theme blocks are an open question (§14).
-  for (const block of content.matchAll(/(?::root|html)[^{}]*\{([^}]*)\}/g)) {
+  // Theme-level rules only: :root / html blocks (plain CSS, common SCSS
+  // pattern) and Tailwind v4 CSS-first `@theme` blocks (in for v0.1 —
+  // item-5 review decision), whose contents are plain custom properties.
+  for (const block of content.matchAll(/(?::root|html|@theme[^{]*)\s*\{([^}]*)\}/g)) {
     for (const declaration of block[1]!.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
       const name = declaration[1]!;
       if (!tokens.has(name)) {

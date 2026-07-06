@@ -442,6 +442,17 @@ window.addEventListener('message', (event: MessageEvent) => {
         setStatus('No API key set — run “Underpainting: Set OpenRouter API Key”. The canvas stays read-only until then.');
       }
       break;
+    case 'modelState': {
+      const note = document.getElementById('model-note') as HTMLDivElement;
+      if (!message.modelId) {
+        note.textContent = 'No model selected — run “Underpainting: Select Generation Model”.';
+      } else {
+        note.textContent =
+          `Sends to ${message.modelId}` +
+          (message.pricing ? ` · ${message.pricing}` : ' · pricing unknown (reopen the model picker)');
+      }
+      break;
+    }
     case 'workspaceState': {
       if (!message.open) {
         const note = document.getElementById('system-note') as HTMLDivElement;

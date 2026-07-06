@@ -129,6 +129,7 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
       color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
     }
     /* The free/paid boundary must be visually unambiguous (P4). */
+    #model-note { font-size: 11px; opacity: .85; font-weight: 600; }
     #paid-note { font-size: 10px; opacity: .7; }
 
     /* ------------------------------------------------ board side */
@@ -204,6 +205,7 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
           <button id="generate" title="Sends one request to OpenRouter using your key">Send&nbsp;·&nbsp;paid</button>
           <button id="cancel" disabled>Cancel</button>
         </div>
+        <div id="model-note" title="The model and catalog pricing Send will use"></div>
         <div id="paid-note">“Send” makes one paid API request with your OpenRouter key. Everything else — selecting, zooming, restoring — is local and free.</div>
       </div>
     </aside>

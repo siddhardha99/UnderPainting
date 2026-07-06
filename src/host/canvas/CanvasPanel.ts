@@ -22,6 +22,8 @@ export interface CanvasDeps {
   loadRefineRecipe: () => Promise<string>;
   loadGroundingPreamble: () => Promise<string>;
   getGenerationModel: () => string | undefined;
+  /** Pricing cached when the model was picked; undefined when hand-edited into settings. */
+  getModelPricing: (modelId: string) => string | undefined;
   onModelUnavailable: (modelId: string) => void;
 }
 
@@ -87,6 +89,22 @@ export class CanvasPanel {
     this.store = workspaceRoot ? new DocumentStore(workspaceRoot) : null;
     const systemStore = workspaceRoot ? new SystemStore(workspaceRoot) : null;
 
+    // The point-of-spend disclosure (P4): which model Send will use and what
+    // it costs, from pricing cached at pick time — display never fetches (P3).
+    const postModelState = (): void => {
+      const modelId = deps.getGenerationModel() ?? null;
+      post({
+        type: 'modelState',
+        modelId,
+        pricing: modelId ? (deps.getModelPricing(modelId) ?? null) : null,
+      });
+    };
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration('underpainting')) postModelState();
+      }),
+    );
+
     // Cheap drift check (§6): rehash the extractor's recorded sources and
     // surface a non-blocking hint. Fire-and-forget; never blocks, never
     // re-extracts silently. Runs on canvas open and before each generation.
@@ -137,6 +155,7 @@ export class CanvasPanel {
         switch (message.type) {
           case 'ready':
             post({ type: 'workspaceState', open: this.store !== null });
+            postModelState();
             void deps.keyVault.hasKey().then((present) => post({ type: 'keyState', present }));
             void this.postFrames(post, null).catch((err) =>
               deps.logger.error(`frame index load failed: ${formatError(err)}`),

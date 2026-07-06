@@ -25,3 +25,7 @@ Resolved at M0 review (2026-07-06):
 The test: point to the prompt phrase the content answers. If there is one, the content is in scope regardless of whether its specifics were dictated. If there isn't, it's A6 material.
 
 Example from the golden set: the Inkwell pricing prompt asks for "a short feature list" per plan — "Up to 50 notes" satisfies the request and must not be flagged; an unrequested testimonial section or a "Trusted by 10,000 teams" banner would be flagged.
+
+### Refinement (item-5 review, 2026-07-06): invented commitments are always flagged
+
+Content invention being licensed does **not** license *commitments*. Invented **policy or claims** — trial offers, "no card required", guarantees, refund/cancellation terms, prices or discounts not in the prompt, security/compliance assertions — are flagged even inside content the prompt requested. Feature names are design material; a 14-day trial is a promise the user's business never made. Golden case: `inkwell-pricing-commitments` (from a live run that added "All plans include a 14-day trial. No card required to start.").

@@ -83,6 +83,15 @@ export const hostToWebviewSchema = z.discriminatedUnion('type', [
     .strict(),
   // Snapshot content for one frame, in response to requestFrame.
   z.object({ type: z.literal('frameContent'), id: frameId, html: z.string() }).strict(),
+  // The active generation model + its catalog pricing (cached at pick time,
+  // never fetched for display — P3), shown at the point of spend (P4).
+  z
+    .object({
+      type: z.literal('modelState'),
+      modelId: z.string().nullable(),
+      pricing: z.string().nullable(),
+    })
+    .strict(),
   // Whether a workspace folder is open — without one, versions/frames/history
   // cannot persist (P5) and the canvas says so upfront.
   z.object({ type: z.literal('workspaceState'), open: z.boolean() }).strict(),

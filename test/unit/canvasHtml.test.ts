@@ -30,6 +30,10 @@ describe('canvas chrome', () => {
     expect(html).toContain('local and free');
   });
 
+  it('shows the active model + pricing at the point of spend (item-1 follow-up)', () => {
+    expect(html).toContain('id="model-note"');
+  });
+
   it('ships the direct-edit toggle labeled as local and free (M1 item 4, P4)', () => {
     const button = html.match(/<button id="edit-text"[^>]*>/);
     expect(button).not.toBeNull();
