@@ -30,6 +30,10 @@ export interface OrchestratorDeps {
   loadCorePrompt: () => Promise<string>;
   /** The refinement recipe, loaded only for refine() invocations (§8). */
   loadRefineRecipe: () => Promise<string>;
+  /** The grounding preamble prepended to the workspace token block (§8, M1 item 5). */
+  loadGroundingPreamble: () => Promise<string>;
+  /** Extracted workspace tokens (tokens.css content), or null when none exist. */
+  loadGroundingTokens: () => Promise<string | null>;
   /** The user's configured generation model, or undefined when none is chosen yet. */
   getGenerationModel: () => string | undefined;
   /**
@@ -71,13 +75,26 @@ export class Orchestrator {
     return this.active !== null;
   }
 
-  /** Fresh design from a prompt. */
+  /** Fresh design from a prompt, grounded in the workspace's extracted tokens when they exist. */
   async generate(userPrompt: string): Promise<void> {
     await this.run(async () => ({
       prompt: userPrompt,
-      system: await this.deps.loadCorePrompt(),
+      system: (await this.deps.loadCorePrompt()) + (await this.groundingSection()),
       user: userPrompt,
     }));
+  }
+
+  /**
+   * The design-system grounding block (M1 item 5): workspace tokens ride in
+   * the system prompt as fenced data behind the grounding preamble. Absent
+   * extraction → empty string, and the core prompt's invent-a-token-set rule
+   * applies.
+   */
+  private async groundingSection(): Promise<string> {
+    const tokens = await this.deps.loadGroundingTokens();
+    if (!tokens) return '';
+    const preamble = await this.deps.loadGroundingPreamble();
+    return `\n\n${preamble}\n\n\`\`\`css\n${tokens}\n\`\`\``;
   }
 
   /** Targeted change to an existing artifact (A7). The result is a NEW version — history is never rewritten. */
@@ -89,7 +106,7 @@ export class Orchestrator {
       ]);
       return {
         prompt: instruction,
-        system: `${core}\n\n${recipe}`,
+        system: `${core}\n\n${recipe}${await this.groundingSection()}`,
         // The artifact rides in the user message as fenced DATA; the recipe
         // pins the untrusted-content framing (§8/§9 prompt-injection stance).
         user: `<<<ARTIFACT\n${baseHtml}\nARTIFACT>>>\n\nInstruction: ${instruction}`,

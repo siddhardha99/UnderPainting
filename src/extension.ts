@@ -10,6 +10,11 @@ import {
 import { RedactingLogger, SecretRedactor, formatError, type Logger } from './host/logging/redact';
 import { CanvasPanel } from './host/canvas/CanvasPanel';
 import { formatModelDetail, suggestEquivalents } from './host/models/catalog';
+import {
+  extractDesignSystem,
+  ExtractionCancelledError,
+} from './host/extractor/DesignSystemExtractor';
+import { SystemStore } from './host/store/SystemStore';
 
 /**
  * Activation is lazy and does no work (≤500ms budget, M0 task 1): commands
@@ -24,6 +29,7 @@ interface Services {
   redactor: SecretRedactor;
   loadCorePrompt: () => Promise<string>;
   loadRefineRecipe: () => Promise<string>;
+  loadGroundingPreamble: () => Promise<string>;
 }
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -43,6 +49,8 @@ export function activate(context: vscode.ExtensionContext): void {
           fs.readFile(path.join(context.extensionUri.fsPath, 'prompts', 'core.md'), 'utf8'),
         loadRefineRecipe: () =>
           fs.readFile(path.join(context.extensionUri.fsPath, 'prompts', 'refine.md'), 'utf8'),
+        loadGroundingPreamble: () =>
+          fs.readFile(path.join(context.extensionUri.fsPath, 'prompts', 'grounding.md'), 'utf8'),
       };
     }
     return services;
@@ -69,7 +77,51 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('underpainting.selectValidationModel', () =>
       selectModel(getServices(), 'validationModel'),
     ),
+    vscode.commands.registerCommand('underpainting.extractDesignSystem', () =>
+      extractSystem(getServices()),
+    ),
   );
+}
+
+/**
+ * Design-system extraction (M1 item 5): explicit user action, purely local,
+ * free — heuristic scanning only, no model call (P3). Cancellable via the
+ * progress notification.
+ */
+async function extractSystem(services: Services): Promise<void> {
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!workspaceRoot) {
+    void vscode.window.showErrorMessage(
+      'Underpainting: open a folder first — the design system is extracted from the workspace.',
+    );
+    return;
+  }
+  try {
+    const system = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Extracting design system (local, free)…',
+        cancellable: true,
+      },
+      (_progress, token) =>
+        extractDesignSystem(workspaceRoot, { isCancelled: () => token.isCancellationRequested }),
+    );
+    await new SystemStore(workspaceRoot).write(system);
+    void vscode.window.showInformationMessage(
+      `Underpainting: extracted ${system.tokens.length} design tokens and ` +
+        `${system.components.length} components from ${system.stats.filesScanned} files ` +
+        `in ${(system.stats.durationMs / 1000).toFixed(1)}s → .design/system/.` +
+        (system.stats.truncated ? ' (Large workspace: scan was capped — results may be partial.)' : '') +
+        ' New generations are now grounded in these tokens.',
+    );
+  } catch (err) {
+    if (err instanceof ExtractionCancelledError) {
+      void vscode.window.showInformationMessage('Underpainting: extraction cancelled — nothing was written.');
+      return;
+    }
+    services.logger.error(`extraction failed: ${formatError(err)}`);
+    void vscode.window.showErrorMessage(`Underpainting: extraction failed — ${formatError(err)}`);
+  }
 }
 
 type ModelSetting = 'generationModel' | 'validationModel';

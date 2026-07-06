@@ -1,9 +1,9 @@
 # `.design/` schema contract
 
-> **Status (M1 item 2):** the DocumentStore is implemented
-> (`src/host/store/DocumentStore.ts`) and writes the `projects/` subtree below.
-> The extractor output (`system/`) and the ledger arrive with later M1 items;
-> their contract is recorded here from BUILD_BRIEF.md §6.
+> **Status (M1 item 5):** the DocumentStore (`projects/` subtree) and the
+> SystemStore (`system/` subtree — tokens.css, components.md, manifest.json
+> with source hashes for drift) are implemented. The ledger arrives with M1
+> item 8; its contract is recorded here from BUILD_BRIEF.md §6.
 
 Every file carries a `schema_version`. Snapshots are immutable — edits create new versions. The store commits only complete, validated states: a cancelled stream never corrupts a document. Anything a team should share is committed; anything personal (spend) is gitignored by default via a shipped `.gitignore`.
 

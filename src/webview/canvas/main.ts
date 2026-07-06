@@ -253,10 +253,11 @@ function syncLiveness(card: FrameCard): void {
     card.iframe.remove();
     card.iframe = null;
     card.iframeLoaded = false;
-    card.html = card.id === PENDING_ID ? card.html : null; // snapshots re-fetch from .design/
+    // Keep card.html: snapshots are immutable, so the cache can never go
+    // stale — re-selecting renders instantly instead of a blank round trip.
     const placeholder = document.createElement('div');
     placeholder.className = 'frame-placeholder';
-    placeholder.textContent = 'Select to render';
+    placeholder.textContent = 'Renders when visible';
     card.clip.appendChild(placeholder);
   }
 }
@@ -441,6 +442,31 @@ window.addEventListener('message', (event: MessageEvent) => {
         setStatus('No API key set — run “Underpainting: Set OpenRouter API Key”. The canvas stays read-only until then.');
       }
       break;
+    case 'workspaceState': {
+      if (!message.open) {
+        const note = document.getElementById('system-note') as HTMLDivElement;
+        note.className = 'stale';
+        note.textContent =
+          '⚠ No folder is open — designs render but versions, frames, and chat history cannot be saved. Open a folder (File → Open Folder), then reopen the canvas.';
+      }
+      break;
+    }
+    case 'systemState': {
+      const note = document.getElementById('system-note') as HTMLDivElement;
+      if (message.stale) {
+        note.className = 'stale';
+        note.textContent =
+          '⚠ Design system may be stale — its source files changed. Run “Underpainting: Extract Design System” to refresh (local, free).';
+      } else if (message.tokensPresent) {
+        note.className = '';
+        note.textContent = `Grounded in your design system: ${message.tokenCount} tokens from .design/system/.`;
+      } else {
+        note.className = '';
+        note.textContent =
+          'No design system extracted yet — run “Underpainting: Extract Design System” to ground generations in your repo’s tokens (local, free).';
+      }
+      break;
+    }
     case 'streamStart': {
       setGenerating(true);
       setStatus('Generating…');

@@ -35,6 +35,10 @@
       {
         "command": "underpainting.selectValidationModel",
         "title": "Underpainting: Select Validation Model"
+      },
+      {
+        "command": "underpainting.extractDesignSystem",
+        "title": "Underpainting: Extract Design System"
       }
     ],
     "configuration": {
