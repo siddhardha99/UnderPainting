@@ -25,6 +25,16 @@ export const webviewToHostSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('selectFrame'), id: frameId }).strict(),
   z.object({ type: z.literal('requestFrame'), id: frameId }).strict(),
   z.object({ type: z.literal('restore'), id: frameId }).strict(),
+  // A finished direct-edit session (M1 item 4): the edited document commits
+  // as a new snapshot of .design/ — a local write, zero API involvement (P4).
+  z
+    .object({
+      type: z.literal('commitEdit'),
+      frameId,
+      html: z.string().min(1).max(5_000_000),
+      editCount: z.number().int().min(1).max(10_000),
+    })
+    .strict(),
 ]);
 export type WebviewToHost = z.infer<typeof webviewToHostSchema>;
 
@@ -75,3 +85,23 @@ export const hostToWebviewSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('frameContent'), id: frameId, html: z.string() }).strict(),
 ]);
 export type HostToWebview = z.infer<typeof hostToWebviewSchema>;
+
+/**
+ * Messages the artifact iframe's trusted bootstrap posts to the canvas
+ * (M1 item 4). The canvas only accepts them from the selected frame's
+ * contentWindow and validates every one — the iframe is still treated as
+ * hostile even though only the nonce'd bootstrap can run script there (P6).
+ */
+export const artifactToCanvasSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('textEdit'),
+      /** childNodes index path from the artifact root to the edited leaf. */
+      path: z.array(z.number().int().min(0).max(10_000)).max(64),
+      /** The leaf's text before editing — the splice verifies it and fails closed on mismatch. */
+      before: z.string().max(100_000),
+      text: z.string().max(100_000),
+    })
+    .strict(),
+]);
+export type ArtifactToCanvas = z.infer<typeof artifactToCanvasSchema>;

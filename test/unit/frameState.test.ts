@@ -47,6 +47,14 @@ describe('frame board state (ADR-009)', () => {
     expect(result.state.selectedId).toBe('a');
   });
 
+  it('a commit without a streaming placeholder (direct-edit save) selects the new version', () => {
+    let state = applyFrames(initialState(), [frame('a', true)], 'a', null).state;
+    state = select(state, 'a');
+    const result = applyFrames(state, [frame('a'), frame('b', true)], 'b', 'b');
+    expect(result.adoptPendingAs).toBeNull(); // nothing to adopt — no pending card
+    expect(result.state.selectedId).toBe('b');
+  });
+
   it('select ignores unknown ids', () => {
     const state = applyFrames(initialState(), [frame('a', true)], 'a', null).state;
     expect(select(state, 'nope').selectedId).toBe('a');

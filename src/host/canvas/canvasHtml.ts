@@ -139,7 +139,10 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
       flex: none;
     }
     #toolbar .spacer { flex: 1; }
-    #toggle-chat, #viewport button, #zoom button {
+    #edit-text[aria-pressed="true"] {
+      color: var(--vscode-button-foreground) !important; background: var(--vscode-button-background) !important;
+    }
+    #toggle-chat, #edit-text, #viewport button, #zoom button {
       color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
       font-size: 12px; padding: 4px 10px;
     }
@@ -205,6 +208,7 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     <main id="main">
       <div id="toolbar">
         <button id="toggle-chat" title="Show or hide the chat — free">Chat</button>
+        <button id="edit-text" aria-pressed="false" title="Edit text directly on the selected frame — local, free, no API call">Edit text</button>
         <span class="spacer"></span>
         <div id="viewport" role="group" aria-label="Preview width of the selected frame — local, free">
           <button data-width="375" aria-pressed="false" title="375px preview — free, no API call">Mobile</button>

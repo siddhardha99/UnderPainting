@@ -42,7 +42,7 @@ export function resetArtifact(host: ArtifactHost): void {
   host.root.textContent = '';
 }
 
-function sanitize(doc: Document): void {
+export function sanitize(doc: Document): void {
   for (const el of Array.from(doc.querySelectorAll(FORBIDDEN_ELEMENTS))) {
     el.remove();
   }
