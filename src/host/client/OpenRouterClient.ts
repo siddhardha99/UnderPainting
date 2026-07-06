@@ -19,6 +19,8 @@ export const ENDPOINTS = {
   credits: `${OPENROUTER_BASE_URL}/credits`,
   /** GET — per-request cost lookup when the stream did not carry usage (P: exact cost, never estimated). */
   generation: `${OPENROUTER_BASE_URL}/generation`,
+  /** GET — the live model catalog with pricing. Fetched only when the user opens a model picker (P3). */
+  models: `${OPENROUTER_BASE_URL}/models`,
 } as const;
 
 /** Transient network errors retry with backoff at most this many times (§9). */
@@ -81,6 +83,25 @@ const streamEventSchema = z
   })
   .passthrough();
 
+// OpenRouter returns per-token prices as decimal strings (e.g. "0.000003").
+const priceSchema = z.union([z.string(), z.number()]).nullish();
+
+const modelsResponseSchema = z.object({
+  data: z.array(
+    z
+      .object({
+        id: z.string(),
+        name: z.string().nullish(),
+        context_length: z.number().nullish(),
+        pricing: z
+          .object({ prompt: priceSchema, completion: priceSchema })
+          .passthrough()
+          .nullish(),
+      })
+      .passthrough(),
+  ),
+});
+
 const generationResponseSchema = z.object({
   data: z
     .object({
@@ -90,6 +111,16 @@ const generationResponseSchema = z.object({
     })
     .passthrough(),
 });
+
+export interface ModelInfo {
+  id: string;
+  name: string | null;
+  contextLength: number | null;
+  /** USD per input token, or null when the catalog doesn't state it. */
+  promptPricePerToken: number | null;
+  /** USD per output token, or null when the catalog doesn't state it. */
+  completionPricePerToken: number | null;
+}
 
 export interface CreditsInfo {
   totalCredits: number;
@@ -103,6 +134,8 @@ export interface StreamChatRequest {
   system: string;
   user: string;
   signal: AbortSignal;
+  /** Optional completion-length cap, forwarded to OpenRouter as max_tokens. */
+  maxTokens?: number;
   /** Called with the accumulated text and the newest delta as tokens arrive. */
   onDelta?: (accumulated: string, delta: string) => void;
 }
@@ -167,6 +200,44 @@ export class OpenRouterClient {
   }
 
   /**
+   * Fetch the live model catalog with pricing. Called only from explicit
+   * user actions — opening a model picker, or accepting the switch dialog
+   * after a model is rejected (P3). Never cached across sessions, never
+   * fetched on activation: no hardcoded model IDs means the catalog is
+   * always current when the user actually looks at it.
+   */
+  async getModels(apiKey?: string, signal?: AbortSignal): Promise<ModelInfo[]> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= TRANSIENT_RETRY_CAP; attempt++) {
+      if (attempt > 0) {
+        await delay(300 * 2 ** (attempt - 1));
+      }
+      try {
+        const res = await this.request(ENDPOINTS.models, {
+          method: 'GET',
+          headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {},
+          signal: signal ?? null,
+        });
+        if (!res.ok) {
+          throw new HttpError(res.status, `OpenRouter /models failed with status ${res.status}.`);
+        }
+        const body = modelsResponseSchema.parse(await res.json());
+        return body.data.map((m) => ({
+          id: m.id,
+          name: m.name ?? null,
+          contextLength: m.context_length ?? null,
+          promptPricePerToken: toPrice(m.pricing?.prompt),
+          completionPricePerToken: toPrice(m.pricing?.completion),
+        }));
+      } catch (err) {
+        if (err instanceof HttpError && err.status < 500) throw err;
+        lastError = err;
+      }
+    }
+    throw lastError;
+  }
+
+  /**
    * Stream a chat completion. Aborting `signal` tears down the HTTP stream
    * immediately (§9: within 1 second) so billing for unconsumed output stops.
    * `usage: {include: true}` asks OpenRouter to append its own accounting to
@@ -183,6 +254,7 @@ export class OpenRouterClient {
         model: req.model,
         stream: true,
         usage: { include: true },
+        ...(req.maxTokens !== undefined ? { max_tokens: req.maxTokens } : {}),
         messages: [
           { role: 'system', content: req.system },
           { role: 'user', content: req.user },
@@ -307,4 +379,10 @@ export class OpenRouterClient {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function toPrice(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
 }
