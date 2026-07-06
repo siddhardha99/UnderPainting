@@ -13,6 +13,10 @@ Extension Host (Node)
 ├─ Orchestrator         src/host/orchestrator/ prompt → stream → cost → commit
 ├─ DocumentStore        src/host/store/       immutable version snapshots + manifest;
 │     commits only complete states — cancelled/failed streams never touch disk
+├─ DesignSystemExtractor src/host/extractor/  READ-ONLY heuristic scan: :root/html
+│     custom props, static Tailwind-classic theme lift (never executes workspace
+│     code), component inventory; async, cancellable, capped; drift via source hashes
+├─ SystemStore          src/host/store/       persists tokens.css/components.md/manifest
 ├─ writeScope guard     src/host/store/       all fs writes confined to .design/ (P5/P9)
 ├─ SecretRedactor       src/host/logging/     every outbound string is scrubbed
 └─ CanvasPanel          src/host/canvas/      webview lifecycle, validated poster
@@ -45,6 +49,10 @@ Canvas Webview (sandboxed)                    src/webview/canvas/
 `Generate` click → `generate` message → Orchestrator streams from OpenRouter → each accumulated buffer passes `extractHtml` (fence/prose stripping) → `streamChunk` posts (throttled ~30ms) → canvas forwards to the artifact iframe → bootstrap parses with `DOMParser` and **morphs** the live DOM (index-based diff, `src/webview/artifact/morph.ts`) — no full reload, stable node identity, so completed content doesn't flicker while later content streams.
 
 Cost is read from OpenRouter's `usage` accounting on the final SSE frame (requested via `usage: {include: true}`); if absent, one follow-up `GET /api/v1/generation` reads the recorded cost (bounded: capped attempts, per-attempt timeout). It is never estimated.
+
+## Design-system grounding (M1 item 5)
+
+“Extract Design System” (explicit, local, free, cancellable) scans the workspace heuristically — `:root`/`html` custom properties, a **static** lift of classic `tailwind.config.*` theme values (workspace code is never executed), and a component inventory with props and cross-file usage counts — and persists to `.design/system/` via the SystemStore. When `tokens.css` exists, generation and refinement prepend `prompts/grounding.md` + the token block (as fenced data) to the system prompt, so artifacts consume the repo's real tokens instead of inventing a palette. Drift: the manifest records source hashes; the canvas re-checks on open and per generation and shows a non-blocking “may be stale” hint — re-extraction is never silent (§6). Model-written component notes are deferred: they'd be an API call and need explicit user action (P3).
 
 ## Chat + refinement (M1 item 3)
 
