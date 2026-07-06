@@ -441,6 +441,15 @@ window.addEventListener('message', (event: MessageEvent) => {
         setStatus('No API key set — run “Underpainting: Set OpenRouter API Key”. The canvas stays read-only until then.');
       }
       break;
+    case 'workspaceState': {
+      if (!message.open) {
+        const note = document.getElementById('system-note') as HTMLDivElement;
+        note.className = 'stale';
+        note.textContent =
+          '⚠ No folder is open — designs render but versions, frames, and chat history cannot be saved. Open a folder (File → Open Folder), then reopen the canvas.';
+      }
+      break;
+    }
     case 'systemState': {
       const note = document.getElementById('system-note') as HTMLDivElement;
       if (message.stale) {

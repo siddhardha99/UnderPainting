@@ -136,6 +136,7 @@ export class CanvasPanel {
         const message = parsed.data;
         switch (message.type) {
           case 'ready':
+            post({ type: 'workspaceState', open: this.store !== null });
             void deps.keyVault.hasKey().then((present) => post({ type: 'keyState', present }));
             void this.postFrames(post, null).catch((err) =>
               deps.logger.error(`frame index load failed: ${formatError(err)}`),

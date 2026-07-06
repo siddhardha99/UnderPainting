@@ -83,6 +83,9 @@ export const hostToWebviewSchema = z.discriminatedUnion('type', [
     .strict(),
   // Snapshot content for one frame, in response to requestFrame.
   z.object({ type: z.literal('frameContent'), id: frameId, html: z.string() }).strict(),
+  // Whether a workspace folder is open — without one, versions/frames/history
+  // cannot persist (P5) and the canvas says so upfront.
+  z.object({ type: z.literal('workspaceState'), open: z.boolean() }).strict(),
   // Design-system grounding state (M1 item 5): shown as a non-blocking hint.
   // Re-extraction is never silent (§6) — the user runs the command.
   z
