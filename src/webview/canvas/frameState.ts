@@ -37,6 +37,17 @@ export function select(state: BoardState, id: string): BoardState {
   return exists ? { ...state, selectedId: id } : state;
 }
 
+/**
+ * Present-mode stepping (v0.2 item 2a): the next version id in manifest
+ * order, clamped at the ends — a slideshow through the design's history.
+ */
+export function stepFrame(frames: FrameMeta[], currentId: string, direction: -1 | 1): string {
+  const index = frames.findIndex((f) => f.id === currentId);
+  if (index === -1) return currentId;
+  const next = Math.min(frames.length - 1, Math.max(0, index + direction));
+  return frames[next]!.id;
+}
+
 export interface ApplyFramesResult {
   state: BoardState;
   /** Non-null when the streaming placeholder should be re-keyed to this committed id. */

@@ -166,7 +166,23 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     #edit-text[aria-pressed="true"] {
       color: var(--vscode-button-foreground) !important; background: var(--vscode-button-background) !important;
     }
-    #toggle-chat, #edit-text, #viewport button, #zoom button {
+    /* Present mode (v0.2 item 2a) — full-screen, interactive, local & free. */
+    #present-overlay {
+      position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column;
+      background: var(--vscode-editor-background);
+    }
+    #present-overlay[hidden] { display: none; }
+    #present-bar {
+      flex: none; display: flex; gap: 10px; align-items: center; padding: 6px 10px;
+      font-size: 12px; border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,.35));
+    }
+    #present-title { font-weight: 600; }
+    #present-pos { opacity: .75; }
+    #present-hint { opacity: .6; font-size: 11px; margin-left: auto; }
+    #present-stage { flex: 1; min-height: 0; background: #ffffff; }
+    #present-stage iframe { width: 100%; height: 100%; border: none; display: block; background: #ffffff; }
+
+    #toggle-chat, #edit-text, #present-button, #viewport button, #zoom button {
       color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
       font-size: 12px; padding: 4px 10px;
     }
@@ -270,6 +286,7 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
       <div id="toolbar">
         <button id="toggle-chat" title="Show or hide the chat — free">Chat</button>
         <button id="edit-text" aria-pressed="false" title="Edit text directly on the selected frame — local, free, no API call">Edit text</button>
+        <button id="present-button" title="Present the selected frame full-screen (Esc exits, ←/→ steps versions) — local, free">Present</button>
         <span class="spacer"></span>
         <div id="viewport" role="group" aria-label="Preview width of the selected frame — local, free">
           <button data-width="375" aria-pressed="false" title="375px preview — free, no API call">Mobile</button>
@@ -287,6 +304,15 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
       <div id="system-note" role="status"></div>
       <div id="board" role="list" aria-label="Design frames"></div>
     </main>
+  </div>
+  <div id="present-overlay" hidden>
+    <div id="present-bar">
+      <span id="present-title"></span>
+      <span id="present-pos"></span>
+      <span id="present-hint">←/→ versions · Esc exit · interactions stay inside the sandbox — local &amp; free</span>
+      <button id="present-close" title="Exit present mode (Esc)">✕</button>
+    </div>
+    <div id="present-stage"></div>
   </div>
   <template id="frame-template" data-nonce="${o.nonce}">
     <div class="frame" role="listitem" tabindex="0">
