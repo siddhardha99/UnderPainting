@@ -25,7 +25,13 @@ function makeDeps(options: {
   const posted: HostToWebview[] = [];
   const logs: string[] = [];
   const unavailableModels: string[] = [];
-  const commits: Array<{ html: string; prompt: string; model: string; clarifications?: unknown }> = [];
+  const commits: Array<{
+    html: string;
+    prompt: string;
+    model: string;
+    clarifications?: unknown;
+    size?: { width: number; height: number };
+  }> = [];
   const spends: Array<{ kind: string; model: string; costUsd: number | null }> = [];
   const logger: Logger = { info: (m) => logs.push(m), error: (m) => logs.push(`ERROR ${m}`) };
   const orchestrator = new Orchestrator({
@@ -48,6 +54,7 @@ function makeDeps(options: {
             prompt: r.prompt,
             model: r.model,
             ...(r.clarifications ? { clarifications: r.clarifications } : {}),
+            ...(r.size ? { size: r.size } : {}),
           })
       : undefined,
     recordSpend: (r) => spends.push({ kind: r.kind, model: r.model, costUsd: r.costUsd }),
@@ -227,7 +234,11 @@ describe('Orchestrator (P3: user money, explicit actions only)', () => {
     expect(users[0]).toContain('a card');
     expect(users[0]).toContain('Clarifications from the user (authoritative):');
     expect(users[0]).toContain('Style direction: minimal');
-    expect(commits[0]!.clarifications).toEqual({ style: 'minimal', variations: 2 });
+    // The resolved target rides with the answers ("a card" → component) and
+    // the commit carries the design-time viewport (2b revision).
+    expect(commits[0]!.clarifications).toEqual({ style: 'minimal', variations: 2, target: 'component' });
+    expect(commits[0]!.size).toEqual({ width: 800, height: 600 });
+    expect(users[0]).toContain('Target: a single component on a canvas');
     expect(commits[0]!.prompt).toBe('a card'); // original prompt, not the folded one
   });
 

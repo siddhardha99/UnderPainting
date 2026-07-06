@@ -48,6 +48,7 @@ Implementation notes:
 - Snapshots (`versions/<ulid>.html`) are written **before** the manifest entry. A crash between the two leaves an orphan snapshot, which is harmless: **the manifest is the index** — orphans are ignored and never listed.
 - Every version is a *frame* on the canvas (ADR-009); the metadata above is exactly what frame cards render, so listing frames never reads snapshot bodies.
 - `costUsd`/token fields are OpenRouter's recorded accounting (`null` when unavailable), never estimates.
+- `position` (`{x, y}`, optional — v0.2 item 2b) is the frame's board placement and the only per-version field that mutates after commit; snapshots themselves stay immutable. Absent → the canvas assigns a deterministic grid slot.
 
 ## Migration policy
 

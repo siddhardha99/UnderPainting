@@ -18,10 +18,11 @@ describe('fieldsToAsk — ask only what the prompt leaves unanswered', () => {
     expect(fieldsToAsk('a hero for our product page', false)).toContain('colors');
   });
 
-  it('artifact-type words suppress the type question', () => {
-    expect(fieldsToAsk('a signup button', false)).not.toContain('artifactType');
-    expect(fieldsToAsk('a landing page for Inkwell', false)).not.toContain('artifactType');
-    expect(fieldsToAsk('something for our launch', false)).toContain('artifactType');
+  it('target words suppress the viewport question (2b revision)', () => {
+    expect(fieldsToAsk('a signup button', false)).not.toContain('target');
+    expect(fieldsToAsk('a landing page for Inkwell', false)).not.toContain('target');
+    expect(fieldsToAsk('a mobile app for watching videos', false)).not.toContain('target');
+    expect(fieldsToAsk('something for our launch', false)).toContain('target');
   });
 
   it('style adjectives and variation counts suppress their fields', () => {
@@ -37,14 +38,15 @@ describe('fieldsToAsk — ask only what the prompt leaves unanswered', () => {
 describe('foldClarifications — answers become an authoritative addendum', () => {
   it('folds only real answers and leaves the prompt itself untouched', () => {
     const folded = foldClarifications('a card', {
-      artifactType: 'component',
+      target: 'component',
       style: 'minimal, calm',
       variations: 2,
     });
     expect(folded.startsWith('a card\n\nClarifications from the user (authoritative):')).toBe(true);
-    expect(folded).toContain('- Artifact type: component');
+    expect(folded).toContain('- Target: a single component on a canvas — design for a 800×600 viewport');
     expect(folded).toContain('- Style direction: minimal, calm');
-    expect(folded).toContain('2 distinct labeled variations');
+    expect(folded).toContain('2 distinct variations');
+    expect(folded).toContain('data-variation="A"');
     expect(folded).not.toContain('Brand colors');
   });
 

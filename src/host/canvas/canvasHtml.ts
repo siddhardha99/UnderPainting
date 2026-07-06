@@ -179,16 +179,12 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     #present-title { font-weight: 600; }
     #present-pos { opacity: .75; }
     #present-hint { opacity: .6; font-size: 11px; margin-left: auto; }
-    #present-stage { flex: 1; min-height: 0; background: #ffffff; }
-    #present-stage iframe { width: 100%; height: 100%; border: none; display: block; background: #ffffff; }
+    #present-stage { flex: 1; min-height: 0; display: flex; justify-content: center; background: var(--vscode-editor-background); }
+    #present-stage iframe { height: 100%; border: none; display: block; background: #ffffff; }
 
-    #toggle-chat, #edit-text, #present-button, #viewport button, #zoom button {
+    #toggle-chat, #edit-text, #present-button, #zoom button {
       color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
       font-size: 12px; padding: 4px 10px;
-    }
-    #viewport { display: flex; gap: 2px; flex: none; }
-    #viewport button[aria-pressed="true"] {
-      color: var(--vscode-button-foreground); background: var(--vscode-button-background);
     }
     #zoom { display: flex; gap: 2px; align-items: center; flex: none; }
     #zoom-level { font-size: 11px; min-width: 4ch; text-align: center; opacity: .8; }
@@ -197,26 +193,36 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     #system-note { padding: 0 8px 4px; font-size: 11px; opacity: .75; flex: none; }
     #system-note.stale { color: var(--vscode-editorWarning-foreground, #cca700); opacity: 1; }
 
+    /* Infinite canvas (2b): #board is the viewport; #surface is the
+       translated+scaled plane frames sit on. All interactions local & free. */
     #board {
-      flex: 1; overflow: auto; padding: 16px;
-      display: flex; flex-wrap: wrap; gap: 16px; align-content: flex-start;
+      flex: 1; overflow: hidden; position: relative;
+      background:
+        radial-gradient(circle, var(--vscode-panel-border, rgba(128,128,128,.25)) 1px, transparent 1px)
+        0 0 / 24px 24px;
     }
-    #board:empty::after {
-      content: 'Generated designs appear here as frames — each version side by side, nothing overwritten.';
-      opacity: .6; font-size: 12px;
+    #board.pan-ready { cursor: grab; }
+    #board.panning { cursor: grabbing; }
+    #board.panning iframe, #board.pan-ready iframe { pointer-events: none; }
+    #surface { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+    #surface:empty::after {
+      content: 'Generated designs appear here as frames — pan with space-drag or scroll, zoom with ctrl/cmd-scroll.';
+      opacity: .6; font-size: 32px; white-space: nowrap; display: block; padding: 48px;
     }
-    .frame { flex: none; display: flex; flex-direction: column; gap: 4px; }
+    .frame { position: absolute; display: flex; flex-direction: column; gap: 8px; }
     .frame-header {
-      display: flex; gap: 6px; align-items: baseline; font-size: 11px;
+      display: flex; gap: 12px; align-items: baseline; font-size: 22px;
       max-width: 100%; overflow: hidden; white-space: nowrap;
+      cursor: grab; user-select: none;
     }
+    .frame-header:active { cursor: grabbing; }
     .frame-title { font-weight: 600; }
     .frame-subtitle { opacity: .65; overflow: hidden; text-overflow: ellipsis; }
     .current-badge {
-      padding: 1px 6px; border-radius: 8px; font-size: 10px;
+      padding: 2px 12px; border-radius: 14px; font-size: 18px;
       background: var(--vscode-badge-background); color: var(--vscode-badge-foreground);
     }
-    .restore { font-size: 10px; padding: 2px 8px; }
+    .restore, .split { font-size: 18px; padding: 4px 14px; }
     .frame-clip {
       position: relative; overflow: hidden; cursor: pointer;
       background: #ffffff; border: 1px solid var(--vscode-panel-border, rgba(128,128,128,.35));
@@ -242,11 +248,13 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
         <textarea id="prompt" placeholder="Describe the UI to generate…" aria-label="Design prompt"></textarea>
         <div id="clarify" hidden>
           <div id="clarify-title">Quick choices — answering is local &amp; free; only Generate spends</div>
-          <div class="clarify-field" data-field="artifactType" hidden>
-            <label>What is it?</label>
-            <div role="radiogroup" aria-label="Artifact type">
-              <button data-value="component" role="radio" aria-checked="false">Component</button>
-              <button data-value="page" role="radio" aria-checked="false">Full page</button>
+          <div class="clarify-field" data-field="target" hidden>
+            <label>What is it? (sets the design's canvas size)</label>
+            <div role="radiogroup" aria-label="Target viewport">
+              <button data-value="component" role="radio" aria-checked="false">Component · 800×600</button>
+              <button data-value="mobile" role="radio" aria-checked="false">Mobile · 390×844</button>
+              <button data-value="tablet" role="radio" aria-checked="false">Tablet · 834×1194</button>
+              <button data-value="desktop" role="radio" aria-checked="false">Desktop · 1440×1400</button>
             </div>
           </div>
           <div class="clarify-field" data-field="style" hidden>
@@ -288,21 +296,19 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
         <button id="edit-text" aria-pressed="false" title="Edit text directly on the selected frame — local, free, no API call">Edit text</button>
         <button id="present-button" title="Present the selected frame full-screen (Esc exits, ←/→ steps versions) — local, free">Present</button>
         <span class="spacer"></span>
-        <div id="viewport" role="group" aria-label="Preview width of the selected frame — local, free">
-          <button data-width="375" aria-pressed="false" title="375px preview — free, no API call">Mobile</button>
-          <button data-width="768" aria-pressed="false" title="768px preview — free, no API call">Tablet</button>
-          <button data-width="1280" aria-pressed="true" title="1280px preview — free, no API call">Desktop</button>
-        </div>
         <div id="zoom" role="group" aria-label="Zoom — local, free">
           <button id="zoom-out" title="Zoom out — free">−</button>
           <span id="zoom-level">40%</span>
           <button id="zoom-in" title="Zoom in — free">+</button>
+          <button id="zoom-100" title="Zoom to 100% — free">100%</button>
           <button id="zoom-fit" title="Fit the selected frame to the board — free">Fit</button>
         </div>
       </div>
       <div id="status" role="status"></div>
       <div id="system-note" role="status"></div>
-      <div id="board" role="list" aria-label="Design frames"></div>
+      <div id="board" aria-label="Design canvas">
+        <div id="surface" role="list" aria-label="Design frames"></div>
+      </div>
     </main>
   </div>
   <div id="present-overlay" hidden>
@@ -321,6 +327,7 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
         <span class="frame-subtitle"></span>
         <span class="current-badge" hidden>current</span>
         <button class="restore" hidden title="Make this the current version — local, free">Restore</button>
+        <button class="split" hidden title="Split marked variations into separate frames — local, free">Split</button>
       </div>
       <div class="frame-clip">
         <iframe sandbox="allow-scripts" srcdoc="${srcdoc}" title="Design artifact frame"></iframe>

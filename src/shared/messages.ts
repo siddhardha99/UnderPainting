@@ -3,7 +3,7 @@ import { z } from 'zod';
 /** Clarify-before-spend answers (v0.2 item 1) — collected by a local, deterministic form; asking is free. */
 export const clarificationsSchema = z
   .object({
-    artifactType: z.enum(['component', 'page']).optional(),
+    target: z.enum(['component', 'mobile', 'tablet', 'desktop']).optional(),
     style: z.string().max(500).optional(),
     colors: z.string().max(500).optional(),
     variations: z.number().int().min(1).max(4).optional(),
@@ -53,6 +53,30 @@ export const webviewToHostSchema = z.discriminatedUnion('type', [
       editCount: z.number().int().min(1).max(10_000),
     })
     .strict(),
+  // Canvas v1 (v0.2 item 2b): drag-arrange persists to the project manifest —
+  // a local pointer write, free (P4/P5).
+  z
+    .object({
+      type: z.literal('moveFrame'),
+      id: frameId,
+      x: z.number().min(-1_000_000).max(1_000_000),
+      y: z.number().min(-1_000_000).max(1_000_000),
+    })
+    .strict(),
+  // Variation split (folds the clarify-variations follow-up into the board):
+  // one multi-variation artifact becomes N sibling versions — local, free.
+  z
+    .object({
+      type: z.literal('splitFrame'),
+      frameId,
+      variations: z
+        .array(
+          z.object({ label: z.string().min(1).max(64), html: z.string().min(1).max(5_000_000) }).strict(),
+        )
+        .min(2)
+        .max(4),
+    })
+    .strict(),
 ]);
 export type WebviewToHost = z.infer<typeof webviewToHostSchema>;
 
@@ -71,6 +95,10 @@ export const frameMetaSchema = z
     isCurrent: z.boolean(),
     /** False when validator issues survived the correction cap (badge on the frame). */
     validated: z.boolean(),
+    /** Board position from the manifest; null → the webview assigns the default grid slot (2b). */
+    position: z.object({ x: z.number(), y: z.number() }).strict().nullable(),
+    /** The frame's design-time viewport (2b revision) — the frame is born at this size. */
+    size: z.object({ width: z.number().min(100), height: z.number().min(100) }).strict(),
   })
   .strict();
 export type FrameMeta = z.infer<typeof frameMetaSchema>;
