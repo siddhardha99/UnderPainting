@@ -30,6 +30,7 @@ function makeDeps(options: {
     keyVault,
     logger,
     loadCorePrompt: async () => 'core prompt',
+    loadRefineRecipe: async () => 'refine recipe',
     getGenerationModel: () => (options.model === 'unset' ? undefined : (options.model ?? 'test/model')),
     onModelUnavailable: (id) => unavailableModels.push(id),
     post: (m) => posted.push(m),
@@ -195,6 +196,32 @@ describe('Orchestrator (P3: user money, explicit actions only)', () => {
     await failed.ready;
     await failed.orchestrator.generate('will fail');
     expect(failed.commits).toHaveLength(0);
+  });
+
+  it('refine sends core+recipe as system, artifact-as-data + instruction as user (A7/§8)', async () => {
+    const requests: Array<{ system: string; user: string }> = [];
+    const frames = [
+      'data: {"id":"g","choices":[{"delta":{"content":"<!doctype html><p>v2</p>"}}],"usage":{"cost":0.002}}\n\n',
+      'data: [DONE]\n\n',
+    ];
+    const { orchestrator, commits, ready } = makeDeps({
+      withKey: true,
+      withCommit: true,
+      fetchFn: async (_url, init) => {
+        const body = JSON.parse(String(init!.body));
+        requests.push({ system: body.messages[0].content, user: body.messages[1].content });
+        return sse(frames);
+      },
+    });
+    await ready;
+    await orchestrator.refine('make the heading blue', '<!doctype html><p>v1</p>');
+
+    expect(requests[0]!.system).toBe('core prompt\n\nrefine recipe');
+    expect(requests[0]!.user).toContain('<<<ARTIFACT\n<!doctype html><p>v1</p>\nARTIFACT>>>');
+    expect(requests[0]!.user).toContain('Instruction: make the heading blue');
+    // The version metadata records the instruction, not the artifact payload.
+    expect(commits[0]!.prompt).toBe('make the heading blue');
+    expect(commits[0]!.html).toBe('<!doctype html><p>v2</p>');
   });
 
   it('makes zero API calls when no generation model is configured (no hardcoded fallback)', async () => {

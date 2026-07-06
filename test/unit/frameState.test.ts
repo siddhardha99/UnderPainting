@@ -10,7 +10,7 @@ import {
 import type { FrameMeta } from '../../src/shared/messages';
 
 function frame(id: string, isCurrent = false): FrameMeta {
-  return { id, title: `t-${id}`, subtitle: `s-${id}`, isCurrent };
+  return { id, title: `t-${id}`, subtitle: `s-${id}`, prompt: `p-${id}`, isCurrent };
 }
 
 describe('frame board state (ADR-009)', () => {

@@ -16,10 +16,9 @@
  *   CSP, so artifact-injected scripts (which never get the nonce) cannot
  *   execute, and no network fetch of any kind is permitted inside them.
  *
- * Frame board (ADR-009): versions render as titled frames in a wrapping flow
- * layout with zoom/fit controls. Everything on the board — select, zoom,
- * viewport width, restore — is local and free (P4); the one paid action is
- * the labeled Generate button.
+ * Layout (ADR-009): a chat sidebar drives generation and refinement of the
+ * selected frame; the board renders versions as titled frames in a wrapping
+ * flow with zoom/fit controls. Everything except Send is local and free (P4).
  */
 
 export interface CanvasHtmlOptions {
@@ -71,46 +70,88 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     :root { color-scheme: light dark; }
     html, body { height: 100%; margin: 0; }
     body {
-      display: flex; flex-direction: column;
       font-family: var(--vscode-font-family); color: var(--vscode-foreground);
       background: var(--vscode-editor-background);
     }
-    #toolbar {
-      display: flex; gap: 8px; align-items: center; padding: 8px;
-      border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,.35));
-      flex: none; flex-wrap: wrap;
-    }
-    #prompt {
-      flex: 1; min-width: 200px; padding: 6px 8px;
-      color: var(--vscode-input-foreground); background: var(--vscode-input-background);
-      border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px;
-      font-family: inherit; font-size: 13px;
-    }
+    #app { display: flex; height: 100%; }
     button {
       padding: 6px 12px; border: none; border-radius: 2px; cursor: pointer;
       font-family: inherit; font-size: 13px;
     }
     button:disabled { opacity: .5; cursor: default; }
-    #generate {
-      color: var(--vscode-button-foreground); background: var(--vscode-button-background);
-      font-weight: 600;
+
+    /* ------------------------------------------------ chat sidebar */
+    #chat {
+      width: 300px; flex: none; display: flex; flex-direction: column;
+      border-right: 1px solid var(--vscode-panel-border, rgba(128,128,128,.35));
+      background: var(--vscode-sideBar-background, transparent);
     }
-    #cancel, #viewport button, #zoom button {
+    #chat[hidden] { display: none; }
+    #chat-log { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .msg { font-size: 12px; line-height: 1.4; border-radius: 6px; padding: 6px 9px; max-width: 95%; }
+    .msg.user {
+      align-self: flex-end;
+      background: var(--vscode-button-background); color: var(--vscode-button-foreground);
+      white-space: pre-wrap;
+    }
+    .msg.result {
+      align-self: flex-start;
+      background: var(--vscode-editorWidget-background, rgba(128,128,128,.15));
+      cursor: pointer;
+    }
+    .msg.result .cost { font-weight: 600; }
+    .msg.error { align-self: flex-start; color: var(--vscode-errorForeground); }
+    .msg .meta { opacity: .65; font-size: 11px; }
+    #chat-compose {
+      flex: none; padding: 8px; display: flex; flex-direction: column; gap: 6px;
+      border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,.35));
+    }
+    #mode { display: flex; gap: 2px; }
+    #mode button {
+      flex: 1; font-size: 11px; padding: 3px 6px;
       color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
     }
+    #mode button[aria-checked="true"] {
+      color: var(--vscode-button-foreground); background: var(--vscode-button-background);
+    }
+    #prompt {
+      resize: vertical; min-height: 52px; padding: 6px 8px;
+      color: var(--vscode-input-foreground); background: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px;
+      font-family: inherit; font-size: 13px;
+    }
+    .compose-row { display: flex; gap: 6px; }
+    #generate {
+      flex: 1; color: var(--vscode-button-foreground); background: var(--vscode-button-background);
+      font-weight: 600;
+    }
+    #cancel {
+      color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
+    }
+    /* The free/paid boundary must be visually unambiguous (P4). */
+    #paid-note { font-size: 10px; opacity: .7; }
+
+    /* ------------------------------------------------ board side */
+    #main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    #toolbar {
+      display: flex; gap: 8px; align-items: center; padding: 8px; flex-wrap: wrap;
+      border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,.35));
+      flex: none;
+    }
+    #toolbar .spacer { flex: 1; }
+    #toggle-chat, #viewport button, #zoom button {
+      color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
+      font-size: 12px; padding: 4px 10px;
+    }
     #viewport { display: flex; gap: 2px; flex: none; }
-    #viewport button, #zoom button { font-size: 12px; padding: 4px 10px; }
     #viewport button[aria-pressed="true"] {
       color: var(--vscode-button-foreground); background: var(--vscode-button-background);
     }
     #zoom { display: flex; gap: 2px; align-items: center; flex: none; }
     #zoom-level { font-size: 11px; min-width: 4ch; text-align: center; opacity: .8; }
-    /* The free/paid boundary must be visually unambiguous (P4). */
-    #paid-note { font-size: 11px; opacity: .75; padding: 2px 8px 6px; flex: none; }
     #status { padding: 4px 8px; font-size: 12px; min-height: 1.2em; flex: none; }
     #status.error { color: var(--vscode-errorForeground); }
 
-    /* Frame board (ADR-009): wrapping flow, no free-form arrange in v0.1. */
     #board {
       flex: 1; overflow: auto; padding: 16px;
       display: flex; flex-wrap: wrap; gap: 16px; align-content: flex-start;
@@ -145,25 +186,42 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
   </style>
 </head>
 <body>
-  <div id="toolbar">
-    <input id="prompt" type="text" placeholder="Describe the UI to generate…" aria-label="Design prompt">
-    <button id="generate" title="Sends one request to OpenRouter using your key">Generate&nbsp;·&nbsp;paid</button>
-    <button id="cancel" disabled>Cancel</button>
-    <div id="viewport" role="group" aria-label="Preview width of the selected frame — local, free">
-      <button data-width="375" aria-pressed="false" title="375px preview — free, no API call">Mobile</button>
-      <button data-width="768" aria-pressed="false" title="768px preview — free, no API call">Tablet</button>
-      <button data-width="1280" aria-pressed="true" title="1280px preview — free, no API call">Desktop</button>
-    </div>
-    <div id="zoom" role="group" aria-label="Zoom — local, free">
-      <button id="zoom-out" title="Zoom out — free">−</button>
-      <span id="zoom-level">40%</span>
-      <button id="zoom-in" title="Zoom in — free">+</button>
-      <button id="zoom-fit" title="Fit the selected frame to the board — free">Fit</button>
-    </div>
+  <div id="app">
+    <aside id="chat" aria-label="Design chat">
+      <div id="chat-log" role="log" aria-live="polite"></div>
+      <div id="chat-compose">
+        <div id="mode" role="radiogroup" aria-label="Send mode">
+          <button id="mode-new" role="radio" aria-checked="true" title="Generate a fresh design — one paid API call">New design</button>
+          <button id="mode-refine" role="radio" aria-checked="false" title="Change only what you ask on the selected frame — one paid API call">Refine selected</button>
+        </div>
+        <textarea id="prompt" placeholder="Describe the UI to generate…" aria-label="Design prompt"></textarea>
+        <div class="compose-row">
+          <button id="generate" title="Sends one request to OpenRouter using your key">Send&nbsp;·&nbsp;paid</button>
+          <button id="cancel" disabled>Cancel</button>
+        </div>
+        <div id="paid-note">“Send” makes one paid API request with your OpenRouter key. Everything else — selecting, zooming, restoring — is local and free.</div>
+      </div>
+    </aside>
+    <main id="main">
+      <div id="toolbar">
+        <button id="toggle-chat" title="Show or hide the chat — free">Chat</button>
+        <span class="spacer"></span>
+        <div id="viewport" role="group" aria-label="Preview width of the selected frame — local, free">
+          <button data-width="375" aria-pressed="false" title="375px preview — free, no API call">Mobile</button>
+          <button data-width="768" aria-pressed="false" title="768px preview — free, no API call">Tablet</button>
+          <button data-width="1280" aria-pressed="true" title="1280px preview — free, no API call">Desktop</button>
+        </div>
+        <div id="zoom" role="group" aria-label="Zoom — local, free">
+          <button id="zoom-out" title="Zoom out — free">−</button>
+          <span id="zoom-level">40%</span>
+          <button id="zoom-in" title="Zoom in — free">+</button>
+          <button id="zoom-fit" title="Fit the selected frame to the board — free">Fit</button>
+        </div>
+      </div>
+      <div id="status" role="status"></div>
+      <div id="board" role="list" aria-label="Design frames"></div>
+    </main>
   </div>
-  <div id="paid-note">“Generate” makes one paid API request with your OpenRouter key. Everything else on this canvas — selecting, zooming, restoring versions — is local and free.</div>
-  <div id="status" role="status"></div>
-  <div id="board" role="list" aria-label="Design frames"></div>
   <template id="frame-template">
     <div class="frame" role="listitem" tabindex="0">
       <div class="frame-header">

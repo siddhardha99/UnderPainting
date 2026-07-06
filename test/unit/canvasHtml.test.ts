@@ -26,8 +26,14 @@ describe('canvas chrome', () => {
   });
 
   it('labels the free/paid boundary unambiguously (P4)', () => {
-    expect(html).toContain('Generate&nbsp;·&nbsp;paid');
+    expect(html).toContain('Send&nbsp;·&nbsp;paid');
     expect(html).toContain('local and free');
+  });
+
+  it('ships the chat sidebar with the new/refine mode toggle (M1 item 3)', () => {
+    for (const id of ['chat', 'chat-log', 'mode-new', 'mode-refine', 'prompt', 'generate', 'cancel']) {
+      expect(html).toContain(`id="${id}"`);
+    }
   });
 
   it('ships the frame board and the frame clone template', () => {
