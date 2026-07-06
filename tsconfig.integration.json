@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "out-test",
+    "rootDir": "test/integration",
+    "types": ["node", "mocha", "vscode"]
+  },
+  "include": ["test/integration"]
+}

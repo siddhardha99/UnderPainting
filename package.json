@@ -1,0 +1,62 @@
+{
+  "name": "underpainting",
+  "displayName": "Underpainting",
+  "description": "Local-first AI design canvas: bring your own OpenRouter key, generate UI grounded in your repo's design system, see the exact cost of every request. No backend, no accounts, no telemetry.",
+  "version": "0.0.1",
+  "publisher": "underpainting",
+  "license": "Apache-2.0",
+  "private": true,
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "underpainting.openCanvas",
+        "title": "Underpainting: Open Canvas"
+      },
+      {
+        "command": "underpainting.setApiKey",
+        "title": "Underpainting: Set OpenRouter API Key"
+      },
+      {
+        "command": "underpainting.clearApiKey",
+        "title": "Underpainting: Clear OpenRouter API Key"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test:unit": "vitest run",
+    "test:integration": "tsc -p tsconfig.integration.json && vscode-test",
+    "test": "npm run test:unit && npm run test:integration",
+    "package": "vsce package --allow-missing-repository --no-rewrite-relative-links",
+    "vscode:prepublish": "node esbuild.mjs --production"
+  },
+  "dependencies": {
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.96.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.4.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.0.0",
+    "happy-dom": "^17.0.0",
+    "mocha": "^10.0.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^3.0.0"
+  }
+}

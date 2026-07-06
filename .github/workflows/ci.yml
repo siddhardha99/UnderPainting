@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install (lockfile-pinned, no lifecycle scripts)
+        run: npm ci --ignore-scripts
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint (includes the P1 network-surface ban)
+        run: npm run lint
+
+      - name: Unit + invariant tests
+        run: npm run test:unit
+
+      - name: Build
+        run: npm run build
+
+      - name: Integration tests (VS Code)
+        run: xvfb-run -a npm run test:integration
+
+      - name: Packaging smoke test
+        run: npm run package
