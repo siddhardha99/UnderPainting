@@ -253,10 +253,11 @@ function syncLiveness(card: FrameCard): void {
     card.iframe.remove();
     card.iframe = null;
     card.iframeLoaded = false;
-    card.html = card.id === PENDING_ID ? card.html : null; // snapshots re-fetch from .design/
+    // Keep card.html: snapshots are immutable, so the cache can never go
+    // stale — re-selecting renders instantly instead of a blank round trip.
     const placeholder = document.createElement('div');
     placeholder.className = 'frame-placeholder';
-    placeholder.textContent = 'Select to render';
+    placeholder.textContent = 'Renders when visible';
     card.clip.appendChild(placeholder);
   }
 }
