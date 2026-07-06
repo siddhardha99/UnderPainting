@@ -11,8 +11,15 @@ const frameId = z.string().min(1).max(64);
 
 export const webviewToHostSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ready') }).strict(),
-  // A 'generate' message is the explicit user action behind every API call (P3).
+  // 'generate' and 'refine' are the explicit user actions behind every API call (P3).
   z.object({ type: z.literal('generate'), prompt: z.string().min(1).max(20_000) }).strict(),
+  z
+    .object({
+      type: z.literal('refine'),
+      frameId,
+      instruction: z.string().min(1).max(20_000),
+    })
+    .strict(),
   z.object({ type: z.literal('cancel') }).strict(),
   // Frame interactions (ADR-009) — all local file operations, free (P4).
   z.object({ type: z.literal('selectFrame'), id: frameId }).strict(),
@@ -21,12 +28,18 @@ export const webviewToHostSchema = z.discriminatedUnion('type', [
 ]);
 export type WebviewToHost = z.infer<typeof webviewToHostSchema>;
 
-/** What the canvas needs to render a frame card without reading its snapshot. */
+/**
+ * What the canvas needs to render a frame card — and, since the chat history
+ * is derived from the version list, one committed chat exchange — without
+ * ever reading a snapshot body.
+ */
 export const frameMetaSchema = z
   .object({
     id: frameId,
     title: z.string(),
     subtitle: z.string(),
+    /** The full prompt/instruction that produced this version (chat user bubble). */
+    prompt: z.string(),
     isCurrent: z.boolean(),
   })
   .strict();

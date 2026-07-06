@@ -17,6 +17,7 @@ export interface CanvasDeps {
   logger: Logger;
   redactor: SecretRedactor;
   loadCorePrompt: () => Promise<string>;
+  loadRefineRecipe: () => Promise<string>;
   getGenerationModel: () => string | undefined;
   onModelUnavailable: (modelId: string) => void;
 }
@@ -87,6 +88,7 @@ export class CanvasPanel {
       keyVault: deps.keyVault,
       logger: deps.logger,
       loadCorePrompt: deps.loadCorePrompt,
+      loadRefineRecipe: deps.loadRefineRecipe,
       getGenerationModel: deps.getGenerationModel,
       onModelUnavailable: deps.onModelUnavailable,
       post,
@@ -117,6 +119,23 @@ export class CanvasPanel {
           case 'generate':
             // Explicit user action → the only path to an API call (P3).
             void this.orchestrator.generate(message.prompt);
+            break;
+          case 'refine':
+            // Refinement targets the selected frame's snapshot (A7, ADR-009).
+            void (async () => {
+              if (!this.store) {
+                post({
+                  type: 'streamError',
+                  message: 'Refining needs saved versions — open a folder first.',
+                });
+                return;
+              }
+              const baseHtml = await this.store.readVersion(message.frameId);
+              await this.orchestrator.refine(message.instruction, baseHtml);
+            })().catch((err) => {
+              post({ type: 'streamError', message: formatError(err) });
+              deps.logger.error(`refine failed: ${formatError(err)}`);
+            });
             break;
           case 'cancel':
             this.orchestrator.cancel();
@@ -178,6 +197,7 @@ function toFrameMeta(v: VersionMeta, currentId: string | null): FrameMeta {
     id: v.id,
     title: `${v.model} — ${cost}`,
     subtitle: `${when} · ${promptExcerpt}`,
+    prompt: v.prompt,
     isCurrent: v.id === currentId,
   };
 }
