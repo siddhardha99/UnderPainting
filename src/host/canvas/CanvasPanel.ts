@@ -210,6 +210,10 @@ export class CanvasPanel {
           case 'cancel':
             this.orchestrator.cancel();
             break;
+          case 'runCommand':
+            // Enum-validated by the schema; these are all our own commands.
+            void vscode.commands.executeCommand(message.command);
+            break;
           case 'selectFrame':
             this.selectedFrameId = message.id;
             break;

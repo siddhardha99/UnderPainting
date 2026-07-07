@@ -39,6 +39,22 @@ export const webviewToHostSchema = z.discriminatedUnion('type', [
     })
     .strict(),
   z.object({ type: z.literal('cancel') }).strict(),
+  // Canvas actions menu: the webview may trigger ONLY these Underpainting
+  // commands — a closed enum, never arbitrary command strings (P6). Each
+  // click is the explicit user action behind whatever the command does (P3).
+  z
+    .object({
+      type: z.literal('runCommand'),
+      command: z.enum([
+        'underpainting.setApiKey',
+        'underpainting.selectGenerationModel',
+        'underpainting.selectValidationModel',
+        'underpainting.extractDesignSystem',
+        'underpainting.showCostLedger',
+        'underpainting.exportDesign',
+      ]),
+    })
+    .strict(),
   // Frame interactions (ADR-009) — all local file operations, free (P4).
   z.object({ type: z.literal('selectFrame'), id: frameId }).strict(),
   z.object({ type: z.literal('requestFrame'), id: frameId }).strict(),

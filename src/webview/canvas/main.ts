@@ -145,6 +145,29 @@ document.getElementById('toggle-chat')!.addEventListener('click', () => {
   chatPanel.hidden = !chatPanel.hidden;
 });
 
+// Actions menu: every entry triggers an enum-allowlisted Underpainting
+// command on the host — the click is the explicit user action (P3).
+const actionsButton = document.getElementById('actions-button') as HTMLButtonElement;
+const actionsMenu = document.getElementById('actions-menu') as HTMLDivElement;
+actionsButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  actionsMenu.hidden = !actionsMenu.hidden;
+  actionsButton.setAttribute('aria-expanded', String(!actionsMenu.hidden));
+});
+window.addEventListener('click', () => {
+  actionsMenu.hidden = true;
+  actionsButton.setAttribute('aria-expanded', 'false');
+});
+for (const item of actionsMenu.querySelectorAll<HTMLButtonElement>('button[data-command]')) {
+  item.addEventListener('click', () => {
+    send({
+      type: 'runCommand',
+      command: item.dataset['command'] as Extract<WebviewToHost, { type: 'runCommand' }>['command'],
+    });
+    actionsMenu.hidden = true;
+  });
+}
+
 function chatBubble(className: string, text: string): HTMLDivElement {
   const el = document.createElement('div');
   el.className = `msg ${className}`;

@@ -182,7 +182,18 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     #present-stage { flex: 1; min-height: 0; display: flex; justify-content: center; background: var(--vscode-editor-background); }
     #present-stage iframe { height: 100%; border: none; display: block; background: #ffffff; }
 
-    #toggle-chat, #edit-text, #present-button, #zoom button {
+    #actions { position: relative; }
+    #actions-menu {
+      position: absolute; top: 100%; left: 0; z-index: 60; min-width: 280px;
+      display: flex; flex-direction: column; padding: 4px; gap: 2px;
+      background: var(--vscode-editorWidget-background, #252526);
+      border: 1px solid var(--vscode-panel-border, rgba(128,128,128,.35));
+      border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,.3);
+    }
+    #actions-menu[hidden] { display: none; }
+    #actions-menu button { text-align: left; font-size: 12px; background: transparent; color: var(--vscode-foreground); }
+    #actions-menu button:hover { background: var(--vscode-list-hoverBackground, rgba(128,128,128,.2)); }
+    #toggle-chat, #edit-text, #present-button, #actions-button, #zoom button {
       color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
       font-size: 12px; padding: 4px 10px;
     }
@@ -295,6 +306,17 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
         <button id="toggle-chat" title="Show or hide the chat — free">Chat</button>
         <button id="edit-text" aria-pressed="false" title="Edit text directly on the selected frame — local, free, no API call">Edit text</button>
         <button id="present-button" title="Present the selected frame full-screen (Esc exits, ←/→ steps versions) — local, free">Present</button>
+        <div id="actions">
+          <button id="actions-button" aria-expanded="false" title="Underpainting setup and tools">⚙ Actions</button>
+          <div id="actions-menu" hidden role="menu">
+            <button data-command="underpainting.setApiKey" role="menuitem">Set OpenRouter API key…</button>
+            <button data-command="underpainting.selectGenerationModel" role="menuitem">Select generation model… (fetches catalog)</button>
+            <button data-command="underpainting.selectValidationModel" role="menuitem">Select validation model… (fetches catalog)</button>
+            <button data-command="underpainting.extractDesignSystem" role="menuitem">Extract design system (local, free)</button>
+            <button data-command="underpainting.showCostLedger" role="menuitem">Cost ledger (local, free)</button>
+            <button data-command="underpainting.exportDesign" role="menuitem">Export / handoff… (local, free)</button>
+          </div>
+        </div>
         <span class="spacer"></span>
         <div id="zoom" role="group" aria-label="Zoom — local, free">
           <button id="zoom-out" title="Zoom out — free">−</button>

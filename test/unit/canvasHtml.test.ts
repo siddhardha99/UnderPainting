@@ -92,3 +92,13 @@ describe('infinite canvas (v0.2 item 2b)', () => {
     expect(template).toMatch(/class="split" hidden/);
   });
 });
+
+describe('actions menu', () => {
+  it('offers every setup/tool command from the UI, labeled by cost nature', () => {
+    for (const cmd of ['setApiKey', 'selectGenerationModel', 'selectValidationModel', 'extractDesignSystem', 'showCostLedger', 'exportDesign']) {
+      expect(html).toContain(`data-command="underpainting.${cmd}"`);
+    }
+    expect(html).toContain('<div id="actions-menu" hidden');
+    expect(html.match(/fetches catalog/g)!.length).toBe(2); // the two paid-ish entries are labeled
+  });
+});

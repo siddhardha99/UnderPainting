@@ -71,3 +71,22 @@ describe('P2: the host poster is a validated, redacting choke point', () => {
     expect(JSON.stringify(posted)).toContain('[REDACTED]');
   });
 });
+
+describe('P6: runCommand is a closed enum, never arbitrary commands', () => {
+  it('accepts only allowlisted Underpainting commands', () => {
+    expect(
+      webviewToHostSchema.safeParse({ type: 'runCommand', command: 'underpainting.setApiKey' }).success,
+    ).toBe(true);
+    for (const hostile of [
+      'workbench.action.terminal.new',
+      'workbench.action.files.save',
+      'underpainting.notARealCommand',
+      'vscode.open',
+    ]) {
+      expect(
+        webviewToHostSchema.safeParse({ type: 'runCommand', command: hostile }).success,
+        hostile,
+      ).toBe(false);
+    }
+  });
+});
