@@ -5,3 +5,4 @@ out-test/
 .vscode-test/
 .DS_Store
 sandbox/.design/
+sandbox/.vscode/
