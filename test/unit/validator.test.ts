@@ -104,11 +104,51 @@ describe('validateArtifact — §7 violations are caught', () => {
     expect(rules(VALID.replace(' width="40" height="40"', ''))).toEqual([]);
   });
 
-  it('the hostile fixture NEVER validates (gates the scripts-enabled commit path)', () => {
+  it('the hostile fixture NEVER validates — static OR interactive (gates the scripts-enabled commit path)', () => {
     const hostile = fs.readFileSync(path.resolve(__dirname, '../fixtures/hostile-artifact.html'), 'utf8');
-    const found = rules(hostile);
-    expect(found).toContain('scripts');
-    expect(found).toContain('A3');
+    // Static mode: the blanket script ban catches it.
+    expect(rules(hostile)).toContain('scripts');
+    // Interactive mode (2c) — scripts are no longer banned outright, so this
+    // is the load-bearing re-assertion: it must STILL fail validation (its
+    // external references and script-built DOM), so it can never reach the
+    // scripts-enabled commit/present render. Containment then rests on the
+    // sandbox + CSP, asserted behaviorally in the integration/csp suites.
+    const interactive = validateArtifact(hostile, { interactive: true }).map((i) => i.rule);
+    expect(interactive.length).toBeGreaterThan(0);
+    expect(interactive).toContain('A3'); // external fetch/link/img refs
+  });
+});
+
+describe('Validator 2c — interactive artifacts permit behavior, never structure', () => {
+  const behaviorScript =
+    '<script>document.querySelector("[data-screen]").addEventListener("click", (e) => {' +
+    ' e.currentTarget.dataset.active = "next"; e.currentTarget.classList.toggle("on");' +
+    ' e.currentTarget.setAttribute("aria-expanded", "true"); });</script>';
+
+  it('static mode still bans all scripts (the two-type boundary)', () => {
+    expect(rules(VALID.replace('</body>', behaviorScript + '</body>'))).toContain('scripts');
+  });
+
+  it('interactive mode allows an inline behavior-only script', () => {
+    const html = VALID.replace('</body>', behaviorScript + '</body>');
+    expect(validateArtifact(html, { interactive: true })).toEqual([]);
+  });
+
+  it('interactive mode flags script-built layout as A2 (never structure)', () => {
+    for (const construction of [
+      '<script>root.innerHTML = "<div>built</div>";</script>',
+      '<script>const n = document.createElement("div"); document.body.appendChild(n);</script>',
+      '<script>el.insertAdjacentHTML("beforeend", "<p>x</p>");</script>',
+      '<script>document.write("<h1>x</h1>");</script>',
+    ]) {
+      const html = VALID.replace('</body>', construction + '</body>');
+      expect(validateArtifact(html, { interactive: true }).map((i) => i.rule), construction).toContain('A2');
+    }
+  });
+
+  it('interactive mode still forbids external scripts (A3 self-containment)', () => {
+    const html = VALID.replace('</body>', '<script src="https://cdn.x/app.js"></script></body>');
+    expect(validateArtifact(html, { interactive: true }).map((i) => i.rule)).toContain('A3');
   });
 });
 

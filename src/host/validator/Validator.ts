@@ -31,7 +31,17 @@ const TOLERATED_VALUE =
 /** Raw color literal anywhere in a tokened property's value = violation. */
 const RAW_COLOR = /#[0-9a-f]{3,8}\b|(?:rgba?|hsla?|oklch|oklab|lab|lch|color)\(/i;
 
-export function validateArtifact(html: string): ValidationIssue[] {
+export interface ValidateOptions {
+  /**
+   * Interactive artifacts (2c) permit inline behavior scripts — vanilla JS
+   * that wires events and toggles state, never builds layout. Static
+   * artifacts (the default) keep the full script ban so direct-edit / split
+   * / A2-literal-DOM keep working (the two-type boundary, ADR-002 addendum).
+   */
+  interactive?: boolean;
+}
+
+export function validateArtifact(html: string, options: ValidateOptions = {}): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
   // ---- structure: one complete document
@@ -82,13 +92,9 @@ export function validateArtifact(html: string): ValidationIssue[] {
     }
   }
 
-  // ---- scripts: forbidden entirely in v0.1 artifacts (core prompt rule 7 / ADR-002)
-  if (/<script\b/i.test(html)) {
-    issues.push({
-      rule: 'scripts',
-      message: 'Artifacts may not contain <script> in v0.1 — layout and content are markup only.',
-    });
-  }
+  // ---- scripts (2c): static artifacts ban them entirely; interactive
+  // artifacts permit inline behavior scripts but never script-built layout.
+  issues.push(...scriptChecks(html, options.interactive ?? false));
 
   // ---- A3: self-containment — no external resource references
   const externalPatterns: Array<[RegExp, string]> = [
@@ -188,6 +194,61 @@ interface OpenElement {
   hasElementChild: boolean;
   hasText: boolean;
   attrs: string;
+}
+
+/**
+ * Script policy (2c). Static artifacts: any `<script>` is a violation.
+ * Interactive artifacts: inline scripts are allowed for BEHAVIOR only —
+ * external scripts (A3) and DOM-construction APIs (A2: script-built layout)
+ * are still rejected, so the editable-DOM guarantees survive and the sandbox
+ * is the only thing standing between a script and the outside world.
+ */
+const DOM_CONSTRUCTION: Array<[RegExp, string]> = [
+  [/\.innerHTML\s*[+]?=/, 'assigning innerHTML'],
+  [/\.outerHTML\s*=/, 'assigning outerHTML'],
+  [/\bdocument\.write\b/, 'document.write'],
+  [/\.insertAdjacentHTML\b/, 'insertAdjacentHTML'],
+  [/\bcreateElement\b|\bcreateElementNS\b/, 'document.createElement'],
+  [/\bcreateContextualFragment\b/, 'createContextualFragment'],
+  [/\.appendChild\b|\.append\(|\.prepend\(|\.insertBefore\b|\.replaceChildren\b/, 'node insertion (appendChild/append/…)'],
+];
+
+function scriptChecks(html: string, interactive: boolean): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+  const hasAnyScript = /<script\b/i.test(html);
+
+  if (!interactive) {
+    if (hasAnyScript) {
+      issues.push({
+        rule: 'scripts',
+        message: 'Static artifacts contain no <script> — layout and content are markup only (use an interactive prototype for behavior).',
+      });
+    }
+    return issues;
+  }
+
+  // Interactive: inline behavior scripts only.
+  for (const script of scripts) {
+    const attrs = script[1] ?? '';
+    if (/\bsrc\s*=/i.test(attrs)) {
+      issues.push({
+        rule: 'A3',
+        message: 'Interactive artifacts use inline scripts only — an external <script src> breaks self-containment.',
+      });
+    }
+    const body = script[2] ?? '';
+    for (const [pattern, label] of DOM_CONSTRUCTION) {
+      if (pattern.test(body)) {
+        issues.push({
+          rule: 'A2',
+          message: `Script builds layout via ${label} — scripts add behavior only; structure and content must be literal markup (so edits map to source).`,
+        });
+        break; // one A2-construction flag per script is enough signal
+      }
+    }
+  }
+  return issues;
 }
 
 /** Minimal well-formedness walk for the A2 leaf rule and A4 explicit dimensions. */

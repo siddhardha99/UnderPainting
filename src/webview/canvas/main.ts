@@ -449,11 +449,44 @@ function selectFrameById(id: string): void {
   render();
 }
 
+// -------------------------------------------- interaction mode (2c, local)
+
+/**
+ * Select vs Interact (2c). Select (default): clicks select frames, text is
+ * directly editable. Interact: pointer events pass into the selected frame's
+ * sandboxed prototype so buttons/toggles work; direct-edit is off. Purely
+ * local CSS/state — free (P4). Present mode (2a) is interactive regardless.
+ */
+let interactionMode: 'select' | 'interact' = 'select';
+const modeSelectButton = document.getElementById('mode-select') as HTMLButtonElement;
+const modeInteractButton = document.getElementById('mode-interact') as HTMLButtonElement;
+
+function setInteractionMode(next: 'select' | 'interact'): void {
+  interactionMode = next;
+  surface.classList.toggle('interact', next === 'interact');
+  modeSelectButton.setAttribute('aria-pressed', String(next === 'select'));
+  modeInteractButton.setAttribute('aria-pressed', String(next === 'interact'));
+  // Direct-edit only in Select mode.
+  editButton.disabled = next === 'interact';
+  if (next === 'interact' && editSession) finishEditSession();
+  setStatus(
+    next === 'interact'
+      ? 'Interact mode — click into the selected prototype; direct-edit is off. Local & free.'
+      : 'Select mode — click frames to select; text is directly editable.',
+  );
+}
+modeSelectButton.addEventListener('click', () => setInteractionMode('select'));
+modeInteractButton.addEventListener('click', () => setInteractionMode('interact'));
+
 // ------------------------------------------------------- direct text editing
 
 editButton.addEventListener('click', () => {
   if (editSession) {
     finishEditSession();
+    return;
+  }
+  if (interactionMode === 'interact') {
+    setStatus('Switch to Select mode to edit text.', true);
     return;
   }
   const target = state.selectedId;

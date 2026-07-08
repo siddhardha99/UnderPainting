@@ -193,7 +193,7 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     #actions-menu[hidden] { display: none; }
     #actions-menu button { text-align: left; font-size: 12px; background: transparent; color: var(--vscode-foreground); }
     #actions-menu button:hover { background: var(--vscode-list-hoverBackground, rgba(128,128,128,.2)); }
-    #toggle-chat, #edit-text, #present-button, #actions-button, #zoom button {
+    #toggle-chat, #edit-text, #present-button, #actions-button, #interaction button, #zoom button {
       color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
       font-size: 12px; padding: 4px 10px;
     }
@@ -215,6 +215,16 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     #board.pan-ready { cursor: grab; }
     #board.panning { cursor: grabbing; }
     #board.panning iframe, #board.pan-ready iframe { pointer-events: none; }
+    /* Select mode (default): clicks fall through the artifact to select the
+       frame, and Edit-text can take over. Interact mode: only the selected
+       frame's iframe receives pointer events, so the prototype is usable. */
+    #surface:not(.interact) .frame-clip iframe { pointer-events: none; }
+    #surface.interact .frame.selected .frame-clip iframe { pointer-events: auto; }
+    #surface.interact .frame.selected .frame-clip { outline-color: var(--vscode-charts-green, #2ea043); }
+    #interaction { display: flex; gap: 2px; }
+    #interaction button[aria-pressed="true"] {
+      color: var(--vscode-button-foreground); background: var(--vscode-button-background);
+    }
     #surface { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
     #surface:empty::after {
       content: 'Generated designs appear here as frames — pan with space-drag or scroll, zoom with ctrl/cmd-scroll.';
@@ -304,6 +314,10 @@ export function buildCanvasHtml(o: CanvasHtmlOptions): string {
     <main id="main">
       <div id="toolbar">
         <button id="toggle-chat" title="Show or hide the chat — free">Chat</button>
+        <div id="interaction" role="group" aria-label="Interaction mode — local, free">
+          <button id="mode-select" aria-pressed="true" title="Select mode: click frames to select; text is directly editable">Select</button>
+          <button id="mode-interact" aria-pressed="false" title="Interact mode: pointer events pass into the prototype (buttons, toggles); direct-edit is off">Interact</button>
+        </div>
         <button id="edit-text" aria-pressed="false" title="Edit text directly on the selected frame — local, free, no API call">Edit text</button>
         <button id="present-button" title="Present the selected frame full-screen (Esc exits, ←/→ steps versions) — local, free">Present</button>
         <div id="actions">
