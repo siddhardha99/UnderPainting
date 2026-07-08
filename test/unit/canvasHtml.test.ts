@@ -102,3 +102,18 @@ describe('actions menu', () => {
     expect(html.match(/fetches catalog/g)!.length).toBe(2); // the two paid-ish entries are labeled
   });
 });
+
+describe('Select/Interact mode (2c)', () => {
+  it('ships the mode toggle, Select active by default', () => {
+    const group = html.match(/<div id="interaction"[\s\S]*?<\/div>/)![0];
+    expect(group).toContain('id="mode-select"');
+    expect(group).toContain('id="mode-interact"');
+    expect(group.match(/aria-pressed="true"/g)!.length).toBe(1);
+    expect(group).toMatch(/id="mode-select"[^>]*aria-pressed="true"/);
+  });
+
+  it('gates artifact pointer events on interact mode (Select falls through to selection)', () => {
+    expect(html).toContain('#surface:not(.interact) .frame-clip iframe { pointer-events: none; }');
+    expect(html).toContain('#surface.interact .frame.selected .frame-clip iframe { pointer-events: auto; }');
+  });
+});
