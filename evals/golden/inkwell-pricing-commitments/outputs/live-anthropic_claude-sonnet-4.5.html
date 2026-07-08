@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<!-- underpainting-scaffold: page v1 — copied into artifacts, never regenerated (A5). -->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --color-background: #fdfcfb;
+  --color-surface: #ffffff;
+  --color-text: #1a1614;
+  --color-text-muted: #6b6460;
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-light: #eef2ff;
+  --color-border: #e7e5e4;
+  
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+  
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.875rem;
+  --font-size-3xl: 2.25rem;
+  
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+/* scaffold base reset (page v1) */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+img, svg, video { display: block; max-width: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+</style>
+</head>
+<body>
+<div style="min-height: 100vh; background-color: var(--color-background); padding: var(--space-3xl) var(--space-lg);">
+  <div style="max-width: 1200px; margin: 0 auto;">
+    
+    <header style="text-align: center; margin-bottom: var(--space-3xl);">
+      <h1 style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-text); margin: 0 0 var(--space-md) 0;">
+        <span>Choose your Inkwell plan</span>
+      </h1>
+      <p style="font-size: var(--font-size-lg); color: var(--color-text-muted); margin: 0;">
+        <span>Start capturing your ideas today</span>
+      </p>
+    </header>
+
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-xl); max-width: 1100px; margin: 0 auto;">
+      
+      <article style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-xl); display: flex; flex-direction: column; box-shadow: var(--shadow-sm);">
+        <div style="margin-bottom: var(--space-xl);">
+          <h2 style="font-size: var(--font-size-xl); font-weight: 600; color: var(--color-text); margin: 0 0 var(--space-xs) 0;">
+            <span>Free</span>
+          </h2>
+          <div style="margin-bottom: var(--space-md);">
+            <span style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-text);">$0</span>
+            <span style="font-size: var(--font-size-base); color: var(--color-text-muted);">/month</span>
+          </div>
+          <p style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin: 0;">
+            <span>Perfect for getting started</span>
+          </p>
+        </div>
+        
+        <ul style="list-style: none; padding: 0; margin: 0 0 var(--space-xl) 0; flex-grow: 1;">
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Up to 50 notes</span>
+          </li>
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Basic text formatting</span>
+          </li>
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Mobile and web access</span>
+          </li>
+          <li style="padding: var(--space-sm) 0;">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Community support</span>
+          </li>
+        </ul>
+        
+        <button style="width: 100%; padding: var(--space-md); background-color: var(--color-surface); color: var(--color-text); border: 2px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-base); font-weight: 600; cursor: pointer;">
+          <span>Get started</span>
+        </button>
+      </article>
+
+      <article style="background-color: var(--color-surface); border: 3px solid var(--color-accent); border-radius: var(--radius-lg); padding: var(--space-xl); display: flex; flex-direction: column; box-shadow: var(--shadow-lg); position: relative; transform: scale(1.05);">
+        <div style="position: absolute; top: 0; right: var(--space-lg); transform: translateY(-50%); background-color: var(--color-accent); color: var(--color-surface); padding: var(--space-xs) var(--space-md); border-radius: var(--radius-md); font-size: var(--font-size-sm); font-weight: 600;">
+          <span>Recommended</span>
+        </div>
+        
+        <div style="margin-bottom: var(--space-xl);">
+          <h2 style="font-size: var(--font-size-xl); font-weight: 600; color: var(--color-text); margin: 0 0 var(--space-xs) 0;">
+            <span>Pro</span>
+          </h2>
+          <div style="margin-bottom: var(--space-md);">
+            <span style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-text);">$8</span>
+            <span style="font-size: var(--font-size-base); color: var(--color-text-muted);">/month</span>
+          </div>
+          <p style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin: 0;">
+            <span>For serious note-takers</span>
+          </p>
+        </div>
+        
+        <ul style="list-style: none; padding: 0; margin: 0 0 var(--space-xl) 0; flex-grow: 1;">
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text); font-weight: 600;">Unlimited notes</span>
+          </li>
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Rich text and markdown</span>
+          </li>
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">File attachments</span>
+          </li>
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Advanced search</span>
+          </li>
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Offline access</span>
+          </li>
+          <li style="padding: var(--space-sm) 0;">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Priority support</span>
+          </li>
+        </ul>
+        
+        <button style="width: 100%; padding: var(--space-md); background-color: var(--color-accent); color: var(--color-surface); border: 2px solid var(--color-accent); border-radius: var(--radius-md); font-size: var(--font-size-base); font-weight: 600; cursor: pointer;">
+          <span>Get started</span>
+        </button>
+      </article>
+
+      <article style="background-color: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-xl); display: flex; flex-direction: column; box-shadow: var(--shadow-sm);">
+        <div style="margin-bottom: var(--space-xl);">
+          <h2 style="font-size: var(--font-size-xl); font-weight: 600; color: var(--color-text); margin: 0 0 var(--space-xs) 0;">
+            <span>Team</span>
+          </h2>
+          <div style="margin-bottom: var(--space-md);">
+            <span style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-text);">$20</span>
+            <span style="font-size: var(--font-size-base); color: var(--color-text-muted);">/month</span>
+          </div>
+          <p style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin: 0;">
+            <span>Collaborate with your team</span>
+          </p>
+        </div>
+        
+        <ul style="list-style: none; padding: 0; margin: 0 0 var(--space-xl) 0; flex-grow: 1;">
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text); font-weight: 600;">Everything in Pro, plus:</span>
+          </li>
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Up to 10 team members</span>
+          </li>
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Shared workspaces</span>
+          </li>
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Team permissions</span>
+          </li>
+          <li style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border);">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Admin dashboard</span>
+          </li>
+          <li style="padding: var(--space-sm) 0;">
+            <span style="font-size: var(--font-size-base); color: var(--color-text);">Dedicated support</span>
+          </li>
+        </ul>
+        
+        <button style="width: 100%; padding: var(--space-md); background-color: var(--color-surface); color: var(--color-text); border: 2px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-base); font-weight: 600; cursor: pointer;">
+          <span>Get started</span>
+        </button>
+      </article>
+
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

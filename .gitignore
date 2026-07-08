@@ -6,3 +6,5 @@ out-test/
 .DS_Store
 sandbox/.design/
 sandbox/.vscode/
+
+.env.evals

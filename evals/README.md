@@ -41,3 +41,10 @@ Example from the golden set: the Inkwell pricing prompt asks for "a short featur
 ### Refinement (item-5 review, 2026-07-06): invented commitments are always flagged
 
 Content invention being licensed does **not** license *commitments*. Invented **policy or claims** — trial offers, "no card required", guarantees, refund/cancellation terms, prices or discounts not in the prompt, security/compliance assertions — are flagged even inside content the prompt requested. Feature names are design material; a 14-day trial is a promise the user's business never made. Golden case: `inkwell-pricing-commitments` (from a live run that added "All plans include a 14-day trial. No card required to start.").
+
+## Live outputs gate on what the product *ships*, not the model's first draft
+
+The live suite (`generate.live.test.ts`) calls the model directly — it bypasses grounding and the validator's correction loop. So a committed `outputs/*.html` is a raw first draft, not what a user receives. Gating therefore splits by whether the product auto-corrects the dimension:
+
+- **`a1-token-styling` is advisory** on live outputs (logged as `[advisory]`, never fails). A1 is exactly what the correction loop (M1 item 6) fixes in-product, so gating raw drafts on it would penalize the model for something the product cleans up. First captured: Sonnet-4.5 emitting a raw `color: white`.
+- **Everything the product does NOT auto-correct hard-gates**: document structure, A2 literal repetition, A3 self-containment, the A6 invented-commitments rule, and instruction-following (one-highlighted-card). A6 is the sharp one — commitments aren't a validator rule, so an invented "Start free trial" *ships*; the fix is prompt strengthening, verified here (core prompt v2).
