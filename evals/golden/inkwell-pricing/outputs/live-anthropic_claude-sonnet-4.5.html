@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<!-- underpainting-scaffold: page v1 — copied into artifacts, never regenerated (A5). -->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --color-background: #fafaf9;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-text: #1c1917;
+  --color-text-muted: #78716c;
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-light: #dbeafe;
+  --color-border: #e7e5e4;
+  --color-border-accent: #93c5fd;
+  
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+  
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 2rem;
+  --font-size-4xl: 2.5rem;
+  
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+  
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-accent: 0 10px 15px -3px rgba(37, 99, 235, 0.2), 0 4px 6px -2px rgba(37, 99, 235, 0.1);
+}
+/* scaffold base reset (page v1) */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+img, svg, video { display: block; max-width: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+</style>
+</head>
+<body>
+<div style="min-height: 100vh; background-color: var(--color-background); padding: var(--space-3xl) var(--space-lg);">
+  <div style="max-width: 1200px; margin: 0 auto;">
+    
+    <div style="text-align: center; margin-bottom: var(--space-3xl);">
+      <h1 style="font-size: var(--font-size-4xl); font-weight: 700; color: var(--color-text); margin: 0 0 var(--space-md) 0; line-height: var(--line-height-tight);">
+        <span>Choose Your Inkwell Plan</span>
+      </h1>
+      <p style="font-size: var(--font-size-lg); color: var(--color-text-muted); margin: 0; line-height: var(--line-height-relaxed);">
+        <span>Start free, upgrade when you need more</span>
+      </p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-xl); align-items: start;">
+      
+      <div style="background-color: var(--color-surface); border-radius: var(--radius-xl); padding: var(--space-xl); box-shadow: var(--shadow-sm); border: 1px solid var(--color-border);">
+        <div style="margin-bottom: var(--space-lg);">
+          <h2 style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-text); margin: 0 0 var(--space-xs) 0; line-height: var(--line-height-tight);">
+            <span>Free</span>
+          </h2>
+          <div style="margin-bottom: var(--space-lg);">
+            <span style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-text); line-height: var(--line-height-tight);">$0</span>
+            <span style="font-size: var(--font-size-base); color: var(--color-text-muted);">/month</span>
+          </div>
+        </div>
+        
+        <ul style="list-style: none; padding: 0; margin: 0 0 var(--space-xl) 0;">
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent-light)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Up to 50 notes</span>
+          </li>
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent-light)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Basic text editing</span>
+          </li>
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent-light)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Mobile apps</span>
+          </li>
+          <li style="display: flex; align-items: flex-start;">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent-light)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Cloud sync</span>
+          </li>
+        </ul>
+        
+        <button style="width: 100%; padding: var(--space-md); background-color: var(--color-surface); color: var(--color-text); border: 2px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-base); font-weight: 600; cursor: pointer;">
+          <span>Get Started</span>
+        </button>
+      </div>
+
+      <div style="background-color: var(--color-surface-elevated); border-radius: var(--radius-xl); padding: var(--space-xl); box-shadow: var(--shadow-accent); border: 2px solid var(--color-border-accent); position: relative; transform: scale(1.05);">
+        <div style="position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); background-color: var(--color-accent); color: white; padding: var(--space-xs) var(--space-lg); border-radius: var(--radius-lg); font-size: var(--font-size-sm); font-weight: 600;">
+          <span>Recommended</span>
+        </div>
+        
+        <div style="margin-bottom: var(--space-lg); margin-top: var(--space-sm);">
+          <h2 style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-text); margin: 0 0 var(--space-xs) 0; line-height: var(--line-height-tight);">
+            <span>Pro</span>
+          </h2>
+          <div style="margin-bottom: var(--space-lg);">
+            <span style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-text); line-height: var(--line-height-tight);">$8</span>
+            <span style="font-size: var(--font-size-base); color: var(--color-text-muted);">/month</span>
+          </div>
+        </div>
+        
+        <ul style="list-style: none; padding: 0; margin: 0 0 var(--space-xl) 0;">
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Unlimited notes</span>
+          </li>
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Rich text formatting</span>
+          </li>
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">File attachments</span>
+          </li>
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Advanced search</span>
+          </li>
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Version history</span>
+          </li>
+          <li style="display: flex; align-items: flex-start;">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Priority support</span>
+          </li>
+        </ul>
+        
+        <button style="width: 100%; padding: var(--space-md); background-color: var(--color-accent); color: white; border: none; border-radius: var(--radius-md); font-size: var(--font-size-base); font-weight: 600; cursor: pointer; box-shadow: var(--shadow-md);">
+          <span>Get Started</span>
+        </button>
+      </div>
+
+      <div style="background-color: var(--color-surface); border-radius: var(--radius-xl); padding: var(--space-xl); box-shadow: var(--shadow-sm); border: 1px solid var(--color-border);">
+        <div style="margin-bottom: var(--space-lg);">
+          <h2 style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-text); margin: 0 0 var(--space-xs) 0; line-height: var(--line-height-tight);">
+            <span>Team</span>
+          </h2>
+          <div style="margin-bottom: var(--space-lg);">
+            <span style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-text); line-height: var(--line-height-tight);">$20</span>
+            <span style="font-size: var(--font-size-base); color: var(--color-text-muted);">/month</span>
+          </div>
+        </div>
+        
+        <ul style="list-style: none; padding: 0; margin: 0 0 var(--space-xl) 0;">
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent-light)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Everything in Pro</span>
+          </li>
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent-light)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Up to 10 team members</span>
+          </li>
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent-light)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Shared workspaces</span>
+          </li>
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent-light)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Real-time collaboration</span>
+          </li>
+          <li style="display: flex; align-items: flex-start; margin-bottom: var(--space-md);">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent-light)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Admin controls</span>
+          </li>
+          <li style="display: flex; align-items: flex-start;">
+            <svg style="width: 20px; height: 20px; margin-right: var(--space-sm); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="10" fill="var(--color-accent-light)"/>
+              <path d="M6 10l2.5 2.5L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span style="font-size: var(--font-size-base); color: var(--color-text); line-height: var(--line-height-normal);">Dedicated support</span>
+          </li>
+        </ul>
+        
+        <button style="width: 100%; padding: var(--space-md); background-color: var(--color-surface); color: var(--color-text); border: 2px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-base); font-weight: 600; cursor: pointer;">
+          <span>Get Started</span>
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

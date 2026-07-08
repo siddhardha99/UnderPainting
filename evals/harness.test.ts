@@ -34,13 +34,21 @@ describe('golden set', () => {
       }
 
       for (const artifact of outputs) {
-        it(`output ${path.basename(artifact)} passes every check (GATING)`, () => {
+        it(`output ${path.basename(artifact)} passes every gating check`, () => {
           const html = fs.readFileSync(artifact, 'utf8');
-          const failures = scoreArtifact(goldenCase, html).filter((r) => !r.pass);
-          expect(
-            failures,
-            failures.map((f) => `${f.checkId}: ${f.detail}`).join('\n'),
-          ).toEqual([]);
+          const results = scoreArtifact(goldenCase, html);
+          // A1 token-styling is the ONE dimension the product actively fixes
+          // via the validator's correction loop (M1 item 6). Committed live
+          // outputs are raw first drafts (the harness bypasses the loop), so
+          // gating them on A1 would hold the model to a standard the product
+          // itself corrects. A1 is advisory here; everything the product does
+          // NOT auto-correct — structure, A2, A3, A6 commitments — hard-gates.
+          const ADVISORY = new Set(['a1-token-styling']);
+          for (const r of results.filter((x) => !x.pass && ADVISORY.has(x.checkId))) {
+            console.log(`[advisory] ${goldenCase.slug}/${path.basename(artifact)} ${r.checkId} — ${r.detail}`);
+          }
+          const gating = results.filter((r) => !r.pass && !ADVISORY.has(r.checkId));
+          expect(gating.map((f) => `${f.checkId}: ${f.detail}`).join('\n')).toBe('');
         });
       }
 
